@@ -11,7 +11,7 @@ import { parseServicesFromWord } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
-import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon } from './components/icons.tsx';
+import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon } from './components/icons.tsx';
 import * as XLSX from 'xlsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
@@ -48,9 +48,30 @@ const App: React.FC = () => {
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [templateModalProps, setTemplateModalProps] = useState({});
     const [isExportTemplateModalOpen, setIsExportTemplateModalOpen] = useState(false);
+    const [isImportMenuOpen, setImportMenuOpen] = useState(false);
+    const [isExportMenuOpen, setExportMenuOpen] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const rosterInputRef = useRef<HTMLInputElement>(null);
+    const importMenuRef = useRef<HTMLDivElement>(null);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
+
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isImportMenuOpen && importMenuRef.current && !importMenuRef.current.contains(event.target as Node)) {
+                setImportMenuOpen(false);
+            }
+            if (isExportMenuOpen && exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+                setExportMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isImportMenuOpen, isExportMenuOpen]);
 
     const showToast = (message: string) => {
         const toast = document.createElement('div');
@@ -494,18 +515,57 @@ const App: React.FC = () => {
                                 <p className='text-xs text-gray-400'>Planificador de Guardia</p>
                             </div>
                         </div>
-                        <div className='flex flex-wrap items-center gap-2'>
+                        <div className='flex flex-wrap items-center justify-end gap-2'>
                             <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className='w-5 h-5'/> Vista General</button>
                             <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className='w-5 h-5'/> Vista por Hora</button>
                             <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className='w-5 h-5'/> Nomencladores</button>
-                            <div className="relative">
-                                <button onClick={() => openTemplateModal({ mode: 'add', serviceType: 'common' })} className='flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors'><BookmarkIcon className='w-5 h-5'/> Añadir desde Plantilla</button>
+                            <button onClick={() => openTemplateModal({ mode: 'add', serviceType: 'common' })} className='flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors'><BookmarkIcon className='w-5 h-5'/> Añadir desde Plantilla</button>
+                            
+                            {/* Import Dropdown */}
+                            <div className="relative" ref={importMenuRef}>
+                                <button onClick={() => setImportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors'>
+                                    <UploadIcon className='w-5 h-5'/>
+                                    <span>Importar</span>
+                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isImportMenuOpen && (
+                                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                                <UploadIcon className='w-4 h-4'/> Importar Rol
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                                <UploadIcon className='w-4 h-4'/> Importar Servicios
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <button onClick={() => setIsRosterModalOpen(true)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors'><UploadIcon className='w-5 h-5'/> Importar Rol</button>
-                            <button onClick={() => fileInputRef.current?.click()} className='flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors'><UploadIcon className='w-5 h-5'/> Importar Servicios</button>
-                            <button onClick={() => setIsExportTemplateModalOpen(true)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors'><DownloadIcon className='w-5 h-5'/> Exportar Plantilla</button>
-                            <button onClick={() => exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() })} className='flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'><DownloadIcon className='w-5 h-5'/> Exportar General</button>
-                            <button onClick={() => exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime })} className='flex items-center gap-2 px-4 py-2 rounded-md bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors'><DownloadIcon className='w-5 h-5'/> Exportar por Hora</button>
+
+                            {/* Export Dropdown */}
+                            <div className="relative" ref={exportMenuRef}>
+                                <button onClick={() => setExportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'>
+                                    <DownloadIcon className='w-5 h-5'/>
+                                    <span>Exportar</span>
+                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isExportMenuOpen && (
+                                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                            <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                                <DownloadIcon className='w-4 h-4'/> Exportar General
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                                <DownloadIcon className='w-4 h-4'/> Exportar por Hora
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                                <DownloadIcon className='w-4 h-4'/> Exportar Plantilla
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
                             {selectedServiceIds.size > 0 && view === 'schedule' && (
                                 <button onClick={handleToggleVisibilityForSelected} className={`flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
                                     {visibilityAction.action === 'hide' ? <EyeOffIcon className='w-5 h-5'/> : <EyeIcon className='w-5 h-5'/>}

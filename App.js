@@ -11,7 +11,7 @@ import { parseServicesFromWord } from './services/wordImportService.js';
 import ScheduleDisplay from './components/ScheduleDisplay.js';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.js';
 import Nomenclador from './components/Nomenclador.js';
-import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon } from './components/icons.js';
+import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon } from './components/icons.js';
 import * as XLSX from 'xlsx';
 import HelpModal from './components/HelpModal.js';
 import RosterImportModal from './components/RosterImportModal.js';
@@ -48,9 +48,29 @@ const App = () => {
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [templateModalProps, setTemplateModalProps] = useState({});
     const [isExportTemplateModalOpen, setIsExportTemplateModalOpen] = useState(false);
+    const [isImportMenuOpen, setImportMenuOpen] = useState(false);
+    const [isExportMenuOpen, setExportMenuOpen] = useState(false);
     
     const fileInputRef = useRef(null);
     const rosterInputRef = useRef(null);
+    const importMenuRef = useRef(null);
+    const exportMenuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isImportMenuOpen && importMenuRef.current && !importMenuRef.current.contains(event.target)) {
+                setImportMenuOpen(false);
+            }
+            if (isExportMenuOpen && exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+                setExportMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isImportMenuOpen, isExportMenuOpen]);
 
     const showToast = (message) => {
         const toast = document.createElement('div');
@@ -490,18 +510,46 @@ const App = () => {
                                 React.createElement("p", { className: "text-xs text-gray-400" }, "Planificador de Guardia")
                             )
                         ),
-                        React.createElement("div", { className: "flex flex-wrap items-center gap-2" },
+                        React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },
                             React.createElement("button", { className: getButtonClass('schedule'), onClick: () => setView('schedule') }, React.createElement(ClipboardListIcon, { className: "w-5 h-5" }), " Vista General"),
                             React.createElement("button", { className: getButtonClass('time-grouped'), onClick: () => setView('time-grouped') }, React.createElement(ClockIcon, { className: "w-5 h-5" }), " Vista por Hora"),
                             React.createElement("button", { className: getButtonClass('nomenclador'), onClick: () => setView('nomenclador') }, React.createElement(BookOpenIcon, { className: "w-5 h-5" }), " Nomencladores"),
-                            React.createElement("div", { className: "relative" },
-                                React.createElement("button", { onClick: () => openTemplateModal({ mode: 'add', serviceType: 'common' }), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors" }, React.createElement(BookmarkIcon, { className: "w-5 h-5" }), " Añadir desde Plantilla")
+                            React.createElement("button", { onClick: () => openTemplateModal({ mode: 'add', serviceType: 'common' }), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors" }, React.createElement(BookmarkIcon, { className: "w-5 h-5" }), " Añadir desde Plantilla"),
+                            
+                            React.createElement("div", { className: "relative", ref: importMenuRef },
+                                React.createElement("button", { onClick: () => setImportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors' },
+                                    React.createElement(UploadIcon, { className: 'w-5 h-5' }),
+                                    React.createElement("span", null, "Importar"),
+                                    React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}` })
+                                ),
+                                isImportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                    React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" }, 
+                                            React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol"),
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" }, 
+                                            React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Servicios")
+                                    )
+                                )
                             ),
-                            React.createElement("button", { onClick: () => setIsRosterModalOpen(true), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors" }, React.createElement(UploadIcon, { className: "w-5 h-5" }), " Importar Rol"),
-                            React.createElement("button", { onClick: () => fileInputRef.current?.click(), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors" }, React.createElement(UploadIcon, { className: "w-5 h-5" }), " Importar Servicios"),
-                            React.createElement("button", { onClick: () => setIsExportTemplateModalOpen(true), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors" }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), " Exportar Plantilla"),
-                            React.createElement("button", { onClick: () => exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors" }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), " Exportar General"),
-                            React.createElement("button", { onClick: () => exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-teal-600 hover:bg-teal-500 text-white font-medium transition-colors" }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), " Exportar por Hora"),
+
+                            React.createElement("div", { className: "relative", ref: exportMenuRef },
+                                React.createElement("button", { onClick: () => setExportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors' },
+                                    React.createElement(DownloadIcon, { className: 'w-5 h-5' }),
+                                    React.createElement("span", null, "Exportar"),
+                                    React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}` })
+                                ),
+                                isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                    React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" }, 
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar General"),
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" }, 
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar por Hora"),
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" }, 
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar Plantilla")
+                                    )
+                                )
+                            ),
+                            
                             selectedServiceIds.size > 0 && view === 'schedule' && (
                                 React.createElement("button", { onClick: handleToggleVisibilityForSelected, className: `flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}` },
                                     visibilityAction.action === 'hide' ? React.createElement(EyeOffIcon, { className: "w-5 h-5" }) : React.createElement(EyeIcon, { className: "w-5 h-5" }),
