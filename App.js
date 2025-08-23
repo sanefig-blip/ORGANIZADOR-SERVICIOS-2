@@ -35,7 +35,7 @@ const parseDateFromString = (dateString) => {
 const App = () => {
     const [schedule, setSchedule] = useState(null);
     const [view, setView] = useState('schedule');
-    const [displayDate, setDisplayDate] = useState(new Date());
+    const [displayDate, setDisplayDate] = useState(null);
     const [commandPersonnel, setCommandPersonnel] = useState([]);
     const [servicePersonnel, setServicePersonnel] = useState([]);
     const [unitList, setUnitList] = useState([]);
@@ -155,11 +155,6 @@ const App = () => {
         setRoster(loadedRoster);
     }, [loadGuardLineFromRoster]);
 
-    const saveSchedule = (newSchedule) => {
-        localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
-        setSchedule(newSchedule);
-    };
-
     const sortPersonnel = (a, b) => {
         const rankComparison = (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99);
         return rankComparison !== 0 ? rankComparison : a.name.localeCompare(b.name);
@@ -193,37 +188,48 @@ const App = () => {
     };
 
     const handleUpdateService = (updatedService, type) => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const newSchedule = { ...schedule, [key]: schedule[key].map(s => s.id === updatedService.id ? updatedService : s) };
-        saveSchedule(newSchedule);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const newSchedule = { ...prevSchedule, [key]: prevSchedule[key].map(s => s.id === updatedService.id ? updatedService : s) };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleAddNewService = (type) => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const newService = {
-            id: `new-service-${Date.now()}`,
-            title: type === 'common' ? "Nuevo Servicio (Editar)" : "Nuevo Evento Deportivo (Editar)",
-            assignments: [], isHidden: false
-        };
-        const list = [...schedule[key]];
-        const firstHiddenIndex = list.findIndex(s => s.isHidden);
-        const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
-        list.splice(insertIndex, 0, newService);
-        saveSchedule({ ...schedule, [key]: list });
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const newService = {
+                id: `new-service-${Date.now()}`,
+                title: type === 'common' ? "Nuevo Servicio (Editar)" : "Nuevo Evento Deportivo (Editar)",
+                assignments: [], isHidden: false
+            };
+            const list = [...prevSchedule[key]];
+            const firstHiddenIndex = list.findIndex(s => s.isHidden);
+            const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
+            list.splice(insertIndex, 0, newService);
+            const newSchedule = { ...prevSchedule, [key]: list };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleMoveService = (serviceId, direction, type) => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const services = [...schedule[key]];
-        const currentIndex = services.findIndex(s => s.id === serviceId);
-        if (currentIndex === -1) return;
-        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= services.length || services[targetIndex].isHidden) return;
-        [services[currentIndex], services[targetIndex]] = [services[targetIndex], services[currentIndex]];
-        saveSchedule({ ...schedule, [key]: services });
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const services = [...prevSchedule[key]];
+            const currentIndex = services.findIndex(s => s.id === serviceId);
+            if (currentIndex === -1) return prevSchedule;
+            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= services.length || services[targetIndex].isHidden) return prevSchedule;
+            [services[currentIndex], services[targetIndex]] = [services[targetIndex], services[currentIndex]];
+            const newSchedule = { ...prevSchedule, [key]: services };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleToggleServiceSelection = (serviceId) => {
@@ -245,51 +251,95 @@ const App = () => {
     };
 
     const handleToggleVisibilityForSelected = () => {
-        if (selectedServiceIds.size === 0 || !schedule) return;
-        const allServices = [...schedule.services, ...schedule.sportsEvents];
-        const firstSelected = allServices.find(s => selectedServiceIds.has(s.id));
-        if (!firstSelected) return;
-        const newVisibility = !firstSelected.isHidden;
-        const updateVisibility = (services) => services.map(s => selectedServiceIds.has(s.id) ? { ...s, isHidden: newVisibility } : s).sort((a, b) => (a.isHidden ? 1 : 0) - (b.isHidden ? 1 : 0));
-        saveSchedule({ ...schedule, services: updateVisibility(schedule.services), sportsEvents: updateVisibility(schedule.sportsEvents) });
-        setSelectedServiceIds(new Set());
+        if (selectedServiceIds.size === 0) return;
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const allServices = [...prevSchedule.services, ...prevSchedule.sportsEvents];
+            const firstSelected = allServices.find(s => selectedServiceIds.has(s.id));
+            if (!firstSelected) return prevSchedule;
+            
+            const newVisibility = !firstSelected.isHidden;
+            const updateVisibility = (services) => services.map(s => selectedServiceIds.has(s.id) ? { ...s, isHidden: newVisibility } : s).sort((a, b) => (a.isHidden ? 1 : 0) - (b.isHidden ? 1 : 0));
+            
+            const newSchedule = { ...prevSchedule, services: updateVisibility(prevSchedule.services), sportsEvents: updateVisibility(prevSchedule.sportsEvents) };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            
+            setSelectedServiceIds(new Set()); // Clear selection after action
+            
+            return newSchedule;
+        });
     };
 
     const handleAssignmentStatusChange = (assignmentId, statusUpdate) => {
-        if (!schedule) return;
-        const newSchedule = JSON.parse(JSON.stringify(schedule));
-        const allServices = [...newSchedule.services, ...newSchedule.sportsEvents];
-        for (const service of allServices) {
-            const assignment = service.assignments.find((a) => a.id === assignmentId);
-            if (assignment) {
-                if ('inService' in statusUpdate) assignment.inService = statusUpdate.inService;
-                if ('serviceEnded' in statusUpdate) assignment.serviceEnded = statusUpdate.serviceEnded;
-                if (assignment.serviceEnded) assignment.inService = true;
-                if (assignment.inService === false) assignment.serviceEnded = false;
-                saveSchedule(newSchedule);
-                break;
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const newSchedule = JSON.parse(JSON.stringify(prevSchedule));
+            const allServices = [...newSchedule.services, ...newSchedule.sportsEvents];
+            for (const service of allServices) {
+                const assignment = service.assignments.find((a) => a.id === assignmentId);
+                if (assignment) {
+                    if ('inService' in statusUpdate) assignment.inService = statusUpdate.inService;
+                    if ('serviceEnded' in statusUpdate) assignment.serviceEnded = statusUpdate.serviceEnded;
+                    if (assignment.serviceEnded) assignment.inService = true;
+                    if (assignment.inService === false) assignment.serviceEnded = false;
+                    localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+                    return newSchedule;
+                }
             }
-        }
+            return prevSchedule;
+        });
     };
 
     const handleDateChange = (part, value) => {
-        if (!schedule) return;
-        const newDate = displayDate ? new Date(displayDate.getTime()) : new Date();
-        const originalDay = newDate.getDate();
-        if (part === 'year') newDate.setFullYear(value);
-        if (part === 'month') newDate.setMonth(value);
-        const daysInNewMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate();
-        if (originalDay > daysInNewMonth) newDate.setDate(daysInNewMonth);
-        if (part === 'day') newDate.setDate(value);
-        
-        const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-        const newDateString = `${newDate.getDate()} DE ${monthNames[newDate.getMonth()]} DE ${newDate.getFullYear()}`;
-        setDisplayDate(newDate);
-        saveSchedule({ ...schedule, date: newDateString });
+        setDisplayDate(prevDate => {
+            const currentDate = prevDate || new Date();
+
+            let year = currentDate.getFullYear();
+            let month = currentDate.getMonth();
+            let day = currentDate.getDate();
+
+            if (part === 'year') year = value;
+            else if (part === 'month') month = value;
+            else if (part === 'day') day = value;
+
+            const daysInTargetMonth = new Date(year, month + 1, 0).getDate();
+            if (day > daysInTargetMonth) {
+                day = daysInTargetMonth;
+            }
+
+            return new Date(year, month, day);
+        });
     };
 
+    useEffect(() => {
+        if (!displayDate) return;
+    
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return prevSchedule;
+    
+            const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            const newDateString = `${displayDate.getDate()} DE ${monthNames[displayDate.getMonth()]} DE ${displayDate.getFullYear()}`;
+            const newCommandStaff = loadGuardLineFromRoster(displayDate, prevSchedule.commandStaff, commandPersonnel);
+            
+            const scheduleNeedsUpdate = prevSchedule.date !== newDateString || JSON.stringify(prevSchedule.commandStaff) !== JSON.stringify(newCommandStaff);
+
+            if (!scheduleNeedsUpdate) {
+                return prevSchedule;
+            }
+            
+            const newSchedule = { 
+                ...prevSchedule, 
+                date: newDateString, 
+                commandStaff: newCommandStaff 
+            };
+            
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            
+            return newSchedule;
+        });
+    }, [displayDate, commandPersonnel, loadGuardLineFromRoster]);
+    
     const handleUpdateCommandStaff = useCallback((updatedStaff, isAutoUpdate = false) => {
-        if (!schedule) return;
         if (!isAutoUpdate) {
             let personnelListWasUpdated = false;
             const newPersonnelList = [...commandPersonnel];
@@ -311,12 +361,18 @@ const App = () => {
                 updateAndSaveCommandPersonnel(newPersonnelList);
             }
         }
-        saveSchedule({ ...schedule, commandStaff: updatedStaff });
-    }, [schedule, commandPersonnel]);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const newSchedule = { ...prevSchedule, commandStaff: updatedStaff };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
+    }, [commandPersonnel]);
+
 
     const handleFileImport = async (event) => {
         const file = event.target.files?.[0];
-        if (!file || !schedule) return;
+        if (!file) return;
         const importMode = prompt("Elige el modo de importación:\n\n1. Añadir\n2. Reemplazar\n\nEscribe '1' o '2'.");
         if (importMode !== '1' && importMode !== '2') {
             alert("Importación cancelada.");
@@ -354,19 +410,23 @@ const App = () => {
             }
             if (newServices.length === 0) { alert("No se encontraron servicios válidos en el archivo."); return; }
             
-            const importedSportsEvents = newServices.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-            const importedCommonServices = newServices.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-            let newSchedule = { ...schedule };
-            if (importMode === '1') { // Add
-                newSchedule.services = [...schedule.services.filter(s => !s.isHidden), ...importedCommonServices, ...schedule.services.filter(s => s.isHidden)];
-                newSchedule.sportsEvents = [...schedule.sportsEvents.filter(s => !s.isHidden), ...importedSportsEvents, ...schedule.sportsEvents.filter(s => s.isHidden)];
-                alert(`${newServices.length} servicio(s) importado(s) y añadidos con éxito.`);
-            } else { // Replace
-                newSchedule.services = importedCommonServices;
-                newSchedule.sportsEvents = importedSportsEvents;
-                alert(`El horario ha sido reemplazado. ${newServices.length} servicio(s) importado(s) con éxito.`);
-            }
-            saveSchedule(newSchedule);
+            setSchedule(prevSchedule => {
+                if (!prevSchedule) return null;
+                const importedSportsEvents = newServices.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
+                const importedCommonServices = newServices.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
+                let newSchedule = { ...prevSchedule };
+                if (importMode === '1') { // Add
+                    newSchedule.services = [...prevSchedule.services.filter(s => !s.isHidden), ...importedCommonServices, ...prevSchedule.services.filter(s => s.isHidden)];
+                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents.filter(s => !s.isHidden), ...importedSportsEvents, ...prevSchedule.sportsEvents.filter(s => s.isHidden)];
+                    alert(`${newServices.length} servicio(s) importado(s) y añadidos con éxito.`);
+                } else { // Replace
+                    newSchedule.services = importedCommonServices;
+                    newSchedule.sportsEvents = importedSportsEvents;
+                    alert(`El horario ha sido reemplazado. ${newServices.length} servicio(s) importado(s) con éxito.`);
+                }
+                localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+                return newSchedule;
+            });
         } catch (error) {
             console.error("Error al importar el archivo:", error); alert("Hubo un error al procesar el archivo.");
         } finally {
@@ -395,31 +455,34 @@ const App = () => {
     };
 
     const handleSelectTemplate = (template, { mode, serviceType, serviceToReplaceId }) => {
-        if (!schedule) return;
-        const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
-        let newSchedule = { ...schedule };
-        if (mode === 'add') {
-            const newService = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
-            delete newService.templateId;
-            const list = [...newSchedule[listKey]];
-            const firstHiddenIndex = list.findIndex(s => s.isHidden);
-            const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
-            list.splice(insertIndex, 0, newService);
-            newSchedule[listKey] = list;
-            showToast(`Servicio "${template.title}" añadido desde plantilla.`);
-        } else if (mode === 'replace' && serviceToReplaceId) {
-            newSchedule[listKey] = newSchedule[listKey].map((s) => {
-                if (s.id === serviceToReplaceId) {
-                    const updatedService = { ...JSON.parse(JSON.stringify(template)), id: s.id };
-                    delete updatedService.templateId;
-                    return updatedService;
-                }
-                return s;
-            });
-            showToast(`Servicio reemplazado con plantilla "${template.title}".`);
-        }
-        saveSchedule(newSchedule);
-        setIsTemplateModalOpen(false);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
+            let newSchedule = { ...prevSchedule };
+            if (mode === 'add') {
+                const newService = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
+                delete newService.templateId;
+                const list = [...newSchedule[listKey]];
+                const firstHiddenIndex = list.findIndex(s => s.isHidden);
+                const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
+                list.splice(insertIndex, 0, newService);
+                newSchedule[listKey] = list;
+                showToast(`Servicio "${template.title}" añadido desde plantilla.`);
+            } else if (mode === 'replace' && serviceToReplaceId) {
+                newSchedule[listKey] = newSchedule[listKey].map((s) => {
+                    if (s.id === serviceToReplaceId) {
+                        const updatedService = { ...JSON.parse(JSON.stringify(template)), id: s.id };
+                        delete updatedService.templateId;
+                        return updatedService;
+                    }
+                    return s;
+                });
+                showToast(`Servicio reemplazado con plantilla "${template.title}".`);
+            }
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            setIsTemplateModalOpen(false);
+            return newSchedule;
+        });
     };
 
     const handleDeleteTemplate = (templateId) => {
@@ -467,7 +530,7 @@ const App = () => {
     }, [selectedServiceIds, schedule]);
 
     const renderContent = () => {
-        if (!schedule) return null;
+        if (!schedule || !displayDate) return null;
         switch (view) {
             case 'schedule':
                 return React.createElement(ScheduleDisplay, {
@@ -490,7 +553,7 @@ const App = () => {
 
     const getButtonClass = (buttonView) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`;
     
-    if (!schedule) {
+    if (!schedule || !displayDate) {
         return React.createElement("div", { className: "bg-gray-900 text-white min-h-screen flex justify-center items-center" }, React.createElement("div", { className: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" }));
     }
 

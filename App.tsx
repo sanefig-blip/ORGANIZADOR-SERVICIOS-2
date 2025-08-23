@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate } from './types.ts';
+import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
 import { rosterData as preloadedRosterData } from './data/rosterData.ts';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.ts';
@@ -35,7 +35,7 @@ const parseDateFromString = (dateString: string): Date => {
 const App: React.FC = () => {
     const [schedule, setSchedule] = useState<Schedule | null>(null);
     const [view, setView] = useState('schedule');
-    const [displayDate, setDisplayDate] = useState<Date>(new Date());
+    const [displayDate, setDisplayDate] = useState<Date | null>(null);
     const [commandPersonnel, setCommandPersonnel] = useState<Personnel[]>([]);
     const [servicePersonnel, setServicePersonnel] = useState<Personnel[]>([]);
     const [unitList, setUnitList] = useState<string[]>([]);
@@ -156,11 +156,6 @@ const App: React.FC = () => {
         setRoster(loadedRoster);
     }, [loadGuardLineFromRoster]);
 
-    const saveSchedule = (newSchedule: Schedule) => {
-        localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
-        setSchedule(newSchedule);
-    };
-
     const sortPersonnel = (a: Personnel, b: Personnel) => {
         const rankComparison = (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99);
         return rankComparison !== 0 ? rankComparison : a.name.localeCompare(b.name);
@@ -194,37 +189,48 @@ const App: React.FC = () => {
     };
 
     const handleUpdateService = (updatedService: Service, type: 'common' | 'sports') => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const newSchedule = { ...schedule, [key]: schedule[key].map(s => s.id === updatedService.id ? updatedService : s) };
-        saveSchedule(newSchedule);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const newSchedule = { ...prevSchedule, [key]: prevSchedule[key].map(s => s.id === updatedService.id ? updatedService : s) };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleAddNewService = (type: 'common' | 'sports') => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const newService: Service = {
-            id: `new-service-${Date.now()}`,
-            title: type === 'common' ? "Nuevo Servicio (Editar)" : "Nuevo Evento Deportivo (Editar)",
-            assignments: [], isHidden: false
-        };
-        const list = [...schedule[key]];
-        const firstHiddenIndex = list.findIndex(s => s.isHidden);
-        const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
-        list.splice(insertIndex, 0, newService);
-        saveSchedule({ ...schedule, [key]: list });
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const newService: Service = {
+                id: `new-service-${Date.now()}`,
+                title: type === 'common' ? "Nuevo Servicio (Editar)" : "Nuevo Evento Deportivo (Editar)",
+                assignments: [], isHidden: false
+            };
+            const list = [...prevSchedule[key]];
+            const firstHiddenIndex = list.findIndex(s => s.isHidden);
+            const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
+            list.splice(insertIndex, 0, newService);
+            const newSchedule = { ...prevSchedule, [key]: list };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleMoveService = (serviceId: string, direction: 'up' | 'down', type: 'common' | 'sports') => {
-        if (!schedule) return;
-        const key = type === 'common' ? 'services' : 'sportsEvents';
-        const services = [...schedule[key]];
-        const currentIndex = services.findIndex(s => s.id === serviceId);
-        if (currentIndex === -1) return;
-        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= services.length || services[targetIndex].isHidden) return;
-        [services[currentIndex], services[targetIndex]] = [services[targetIndex], services[currentIndex]];
-        saveSchedule({ ...schedule, [key]: services });
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const key = type === 'common' ? 'services' : 'sportsEvents';
+            const services = [...prevSchedule[key]];
+            const currentIndex = services.findIndex(s => s.id === serviceId);
+            if (currentIndex === -1) return prevSchedule;
+            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= services.length || services[targetIndex].isHidden) return prevSchedule;
+            [services[currentIndex], services[targetIndex]] = [services[targetIndex], services[currentIndex]];
+            const newSchedule = { ...prevSchedule, [key]: services };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
     };
 
     const handleToggleServiceSelection = (serviceId: string) => {
@@ -246,51 +252,95 @@ const App: React.FC = () => {
     };
 
     const handleToggleVisibilityForSelected = () => {
-        if (selectedServiceIds.size === 0 || !schedule) return;
-        const allServices = [...schedule.services, ...schedule.sportsEvents];
-        const firstSelected = allServices.find(s => selectedServiceIds.has(s.id));
-        if (!firstSelected) return;
-        const newVisibility = !firstSelected.isHidden;
-        const updateVisibility = (services: Service[]) => services.map(s => selectedServiceIds.has(s.id) ? { ...s, isHidden: newVisibility } : s).sort((a, b) => (a.isHidden ? 1 : 0) - (b.isHidden ? 1 : 0));
-        saveSchedule({ ...schedule, services: updateVisibility(schedule.services), sportsEvents: updateVisibility(schedule.sportsEvents) });
-        setSelectedServiceIds(new Set());
+        if (selectedServiceIds.size === 0) return;
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const allServices = [...prevSchedule.services, ...prevSchedule.sportsEvents];
+            const firstSelected = allServices.find(s => selectedServiceIds.has(s.id));
+            if (!firstSelected) return prevSchedule;
+            
+            const newVisibility = !firstSelected.isHidden;
+            const updateVisibility = (services: Service[]) => services.map(s => selectedServiceIds.has(s.id) ? { ...s, isHidden: newVisibility } : s).sort((a, b) => (a.isHidden ? 1 : 0) - (b.isHidden ? 1 : 0));
+            
+            const newSchedule = { ...prevSchedule, services: updateVisibility(prevSchedule.services), sportsEvents: updateVisibility(prevSchedule.sportsEvents) };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            
+            setSelectedServiceIds(new Set()); // Clear selection after action
+            
+            return newSchedule;
+        });
     };
 
     const handleAssignmentStatusChange = (assignmentId: string, statusUpdate: { inService?: boolean; serviceEnded?: boolean }) => {
-        if (!schedule) return;
-        const newSchedule = JSON.parse(JSON.stringify(schedule));
-        const allServices = [...newSchedule.services, ...newSchedule.sportsEvents];
-        for (const service of allServices) {
-            const assignment = service.assignments.find((a: any) => a.id === assignmentId);
-            if (assignment) {
-                if ('inService' in statusUpdate) assignment.inService = statusUpdate.inService;
-                if ('serviceEnded' in statusUpdate) assignment.serviceEnded = statusUpdate.serviceEnded;
-                if (assignment.serviceEnded) assignment.inService = true;
-                if (assignment.inService === false) assignment.serviceEnded = false;
-                saveSchedule(newSchedule);
-                break;
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const newSchedule = JSON.parse(JSON.stringify(prevSchedule));
+            const allServices = [...newSchedule.services, ...newSchedule.sportsEvents];
+            for (const service of allServices) {
+                const assignment = service.assignments.find((a: any) => a.id === assignmentId);
+                if (assignment) {
+                    if ('inService' in statusUpdate) assignment.inService = statusUpdate.inService;
+                    if ('serviceEnded' in statusUpdate) assignment.serviceEnded = statusUpdate.serviceEnded;
+                    if (assignment.serviceEnded) assignment.inService = true;
+                    if (assignment.inService === false) assignment.serviceEnded = false;
+                    localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+                    return newSchedule;
+                }
             }
-        }
+            return prevSchedule;
+        });
+    };
+    
+    const handleDateChange = (part: 'day' | 'month' | 'year', value: number) => {
+        setDisplayDate(prevDate => {
+            const currentDate = prevDate || new Date();
+
+            let year = currentDate.getFullYear();
+            let month = currentDate.getMonth();
+            let day = currentDate.getDate();
+
+            if (part === 'year') year = value;
+            else if (part === 'month') month = value;
+            else if (part === 'day') day = value;
+
+            const daysInTargetMonth = new Date(year, month + 1, 0).getDate();
+            if (day > daysInTargetMonth) {
+                day = daysInTargetMonth;
+            }
+
+            return new Date(year, month, day);
+        });
     };
 
-    const handleDateChange = (part: 'day' | 'month' | 'year', value: number) => {
-        if (!schedule) return;
-        const newDate = displayDate ? new Date(displayDate.getTime()) : new Date();
-        const originalDay = newDate.getDate();
-        if (part === 'year') newDate.setFullYear(value);
-        if (part === 'month') newDate.setMonth(value);
-        const daysInNewMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate();
-        if (originalDay > daysInNewMonth) newDate.setDate(daysInNewMonth);
-        if (part === 'day') newDate.setDate(value);
-        
-        const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-        const newDateString = `${newDate.getDate()} DE ${monthNames[newDate.getMonth()]} DE ${newDate.getFullYear()}`;
-        setDisplayDate(newDate);
-        saveSchedule({ ...schedule, date: newDateString });
-    };
+    useEffect(() => {
+        if (!displayDate) return;
+    
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return prevSchedule;
+    
+            const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            const newDateString = `${displayDate.getDate()} DE ${monthNames[displayDate.getMonth()]} DE ${displayDate.getFullYear()}`;
+            const newCommandStaff = loadGuardLineFromRoster(displayDate, prevSchedule.commandStaff, commandPersonnel);
+            
+            const scheduleNeedsUpdate = prevSchedule.date !== newDateString || JSON.stringify(prevSchedule.commandStaff) !== JSON.stringify(newCommandStaff);
+
+            if (!scheduleNeedsUpdate) {
+                return prevSchedule;
+            }
+            
+            const newSchedule = { 
+                ...prevSchedule, 
+                date: newDateString, 
+                commandStaff: newCommandStaff 
+            };
+            
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            
+            return newSchedule;
+        });
+    }, [displayDate, commandPersonnel, loadGuardLineFromRoster]);
 
     const handleUpdateCommandStaff = useCallback((updatedStaff: Officer[], isAutoUpdate = false) => {
-        if (!schedule) return;
         if (!isAutoUpdate) {
             let personnelListWasUpdated = false;
             const newPersonnelList = [...commandPersonnel];
@@ -310,17 +360,20 @@ const App: React.FC = () => {
             });
             if (personnelListWasUpdated) {
                 updateAndSaveCommandPersonnel(newPersonnelList);
-            } else {
-                 saveSchedule({ ...schedule, commandStaff: updatedStaff });
             }
-        } else {
-            saveSchedule({ ...schedule, commandStaff: updatedStaff });
         }
-    }, [schedule, commandPersonnel]);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const newSchedule = { ...prevSchedule, commandStaff: updatedStaff };
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            return newSchedule;
+        });
+    }, [commandPersonnel]);
+
 
     const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !schedule) return;
+        if (!file) return;
         const importMode = prompt("Elige el modo de importación:\n\n1. Añadir\n2. Reemplazar\n\nEscribe '1' o '2'.");
         if (importMode !== '1' && importMode !== '2') {
             alert("Importación cancelada.");
@@ -358,19 +411,23 @@ const App: React.FC = () => {
             }
             if (newServices.length === 0) { alert("No se encontraron servicios válidos en el archivo."); return; }
             
-            const importedSportsEvents = newServices.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-            const importedCommonServices = newServices.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-            let newSchedule = { ...schedule };
-            if (importMode === '1') { // Add
-                newSchedule.services = [...schedule.services.filter(s => !s.isHidden), ...importedCommonServices, ...schedule.services.filter(s => s.isHidden)];
-                newSchedule.sportsEvents = [...schedule.sportsEvents.filter(s => !s.isHidden), ...importedSportsEvents, ...schedule.sportsEvents.filter(s => s.isHidden)];
-                alert(`${newServices.length} servicio(s) importado(s) y añadidos con éxito.`);
-            } else { // Replace
-                newSchedule.services = importedCommonServices;
-                newSchedule.sportsEvents = importedSportsEvents;
-                alert(`El horario ha sido reemplazado. ${newServices.length} servicio(s) importado(s) con éxito.`);
-            }
-            saveSchedule(newSchedule);
+            setSchedule(prevSchedule => {
+                if (!prevSchedule) return null;
+                const importedSportsEvents = newServices.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
+                const importedCommonServices = newServices.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
+                let newSchedule = { ...prevSchedule };
+                if (importMode === '1') { // Add
+                    newSchedule.services = [...prevSchedule.services.filter(s => !s.isHidden), ...importedCommonServices, ...prevSchedule.services.filter(s => s.isHidden)];
+                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents.filter(s => !s.isHidden), ...importedSportsEvents, ...prevSchedule.sportsEvents.filter(s => s.isHidden)];
+                    alert(`${newServices.length} servicio(s) importado(s) y añadidos con éxito.`);
+                } else { // Replace
+                    newSchedule.services = importedCommonServices;
+                    newSchedule.sportsEvents = importedSportsEvents;
+                    alert(`El horario ha sido reemplazado. ${newServices.length} servicio(s) importado(s) con éxito.`);
+                }
+                localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+                return newSchedule;
+            });
         } catch (error) {
             console.error("Error al importar el archivo:", error); alert("Hubo un error al procesar el archivo.");
         } finally {
@@ -393,37 +450,41 @@ const App: React.FC = () => {
     };
 
     const handleSaveAsTemplate = (service: Service) => {
-        const newTemplate = { ...JSON.parse(JSON.stringify(service)), templateId: `template-${Date.now()}` };
+        const newTemplate: ServiceTemplate = { ...JSON.parse(JSON.stringify(service)), templateId: `template-${Date.now()}` };
         updateAndSaveTemplates([...serviceTemplates, newTemplate]);
         showToast(`Servicio "${service.title}" guardado como plantilla.`);
     };
 
     const handleSelectTemplate = (template: ServiceTemplate, { mode, serviceType, serviceToReplaceId }: any) => {
-        if (!schedule) return;
-        const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
-        let newSchedule = { ...schedule };
-        if (mode === 'add') {
-            const newService = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
-            delete newService.templateId;
-            const list = [...newSchedule[listKey]];
-            const firstHiddenIndex = list.findIndex(s => s.isHidden);
-            const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
-            list.splice(insertIndex, 0, newService);
-            newSchedule[listKey] = list;
-            showToast(`Servicio "${template.title}" añadido desde plantilla.`);
-        } else if (mode === 'replace' && serviceToReplaceId) {
-            newSchedule[listKey] = newSchedule[listKey].map((s: Service) => {
-                if (s.id === serviceToReplaceId) {
-                    const updatedService = { ...JSON.parse(JSON.stringify(template)), id: s.id };
-                    delete updatedService.templateId;
-                    return updatedService;
-                }
-                return s;
-            });
-            showToast(`Servicio reemplazado con plantilla "${template.title}".`);
-        }
-        saveSchedule(newSchedule);
-        setIsTemplateModalOpen(false);
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+            const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
+            let newSchedule = { ...prevSchedule };
+
+            if (mode === 'add') {
+                const newService = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
+                delete newService.templateId;
+                const list = [...newSchedule[listKey]];
+                const firstHiddenIndex = list.findIndex(s => s.isHidden);
+                const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
+                list.splice(insertIndex, 0, newService);
+                newSchedule[listKey] = list;
+                showToast(`Servicio "${template.title}" añadido desde plantilla.`);
+            } else if (mode === 'replace' && serviceToReplaceId) {
+                newSchedule[listKey] = newSchedule[listKey].map((s: Service) => {
+                    if (s.id === serviceToReplaceId) {
+                        const updatedService = { ...JSON.parse(JSON.stringify(template)), id: s.id };
+                        delete updatedService.templateId;
+                        return updatedService;
+                    }
+                    return s;
+                });
+                showToast(`Servicio reemplazado con plantilla "${template.title}".`);
+            }
+            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+            setIsTemplateModalOpen(false);
+            return newSchedule;
+        });
     };
 
     const handleDeleteTemplate = (templateId: string) => {
@@ -447,7 +508,7 @@ const App: React.FC = () => {
 
     const getAssignmentsByTime = useMemo(() => {
         if (!schedule) return {};
-        const grouped: { [time: string]: any[] } = {};
+        const grouped: { [key: string]: Assignment[] } = {};
         [...schedule.services, ...schedule.sportsEvents].filter(s => !s.isHidden).forEach(service => {
           service.assignments.forEach(assignment => {
             const timeKey = assignment.time;
@@ -471,7 +532,7 @@ const App: React.FC = () => {
     }, [selectedServiceIds, schedule]);
 
     const renderContent = () => {
-        if (!schedule) return null;
+        if (!schedule || !displayDate) return null;
         switch (view) {
             case 'schedule':
                 return <ScheduleDisplay
@@ -494,7 +555,7 @@ const App: React.FC = () => {
 
     const getButtonClass = (buttonView: string) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`;
     
-    if (!schedule) {
+    if (!schedule || !displayDate) {
         return <div className="bg-gray-900 text-white min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
     }
 
@@ -502,81 +563,69 @@ const App: React.FC = () => {
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx" />
             <input type="file" ref={rosterInputRef} onChange={handleRosterImport} style={{ display: 'none' }} accept=".json" />
-
-            <header className='bg-gray-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg'>
-                <div className='container mx-auto px-4 sm:px-6 lg:px-8'>
-                    <div className='flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0'>
-                        <div className='flex items-center mb-4 sm:mb-0'>
-                            <button onClick={handleResetData} className='mr-2 text-gray-400 hover:text-white transition-colors' aria-label='Reiniciar Datos'><RefreshIcon className='w-6 h-6'/></button>
-                            <button onClick={() => setIsHelpModalOpen(true)} className='mr-4 text-gray-400 hover:text-white transition-colors' aria-label='Ayuda'><QuestionMarkCircleIcon className='w-6 h-6'/></button>
-                            <CalendarIcon className='w-10 h-10 text-blue-400 mr-3' />
+            <header className="bg-gray-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
+                <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0">
+                        <div className="flex items-center mb-4 sm:mb-0">
+                            <button onClick={handleResetData} className="mr-2 text-gray-400 hover:text-white transition-colors" aria-label="Reiniciar Datos"><RefreshIcon className="w-6 h-6" /></button>
+                            <button onClick={() => setIsHelpModalOpen(true)} className="mr-4 text-gray-400 hover:text-white transition-colors" aria-label="Ayuda"><QuestionMarkCircleIcon className="w-6 h-6" /></button>
+                            <CalendarIcon className="w-10 h-10 text-blue-400 mr-3" />
                             <div>
-                                <h1 className='text-xl sm:text-2xl font-bold tracking-tight'>Servicios del Cuerpo de Bomberos de la Ciudad</h1>
-                                <p className='text-xs text-gray-400'>Planificador de Guardia</p>
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Servicios del Cuerpo de Bomberos de la Ciudad</h1>
+                                <p className="text-xs text-gray-400">Planificador de Guardia</p>
                             </div>
                         </div>
-                        <div className='flex flex-wrap items-center justify-end gap-2'>
-                            <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className='w-5 h-5'/> Vista General</button>
-                            <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className='w-5 h-5'/> Vista por Hora</button>
-                            <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className='w-5 h-5'/> Nomencladores</button>
-                            <button onClick={() => openTemplateModal({ mode: 'add', serviceType: 'common' })} className='flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors'><BookmarkIcon className='w-5 h-5'/> Añadir desde Plantilla</button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Vista General</button>
+                            <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className="w-5 h-5" /> Vista por Hora</button>
+                            <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className="w-5 h-5" /> Nomencladores</button>
+                            <button onClick={() => openTemplateModal({ mode: 'add', serviceType: 'common' })} className="flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors"><BookmarkIcon className="w-5 h-5" /> Añadir desde Plantilla</button>
                             
-                            {/* Import Dropdown */}
                             <div className="relative" ref={importMenuRef}>
                                 <button onClick={() => setImportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors'>
-                                    <UploadIcon className='w-5 h-5'/>
+                                    <UploadIcon className='w-5 h-5' />
                                     <span>Importar</span>
                                     <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
-                                {isImportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
-                                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                                <UploadIcon className='w-4 h-4'/> Importar Rol
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                                <UploadIcon className='w-4 h-4'/> Importar Servicios
-                                            </a>
-                                        </div>
+                                {isImportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                            <UploadIcon className='w-4 h-4' /> Importar Rol</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                            <UploadIcon className='w-4 h-4' /> Importar Servicios</a>
                                     </div>
-                                )}
+                                </div>}
                             </div>
 
-                            {/* Export Dropdown */}
                             <div className="relative" ref={exportMenuRef}>
                                 <button onClick={() => setExportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'>
-                                    <DownloadIcon className='w-5 h-5'/>
+                                    <DownloadIcon className='w-5 h-5' />
                                     <span>Exportar</span>
                                     <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
-                                {isExportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
-                                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                            <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                                <DownloadIcon className='w-4 h-4'/> Exportar General
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                                <DownloadIcon className='w-4 h-4'/> Exportar por Hora
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                                <DownloadIcon className='w-4 h-4'/> Exportar Plantilla
-                                            </a>
-                                        </div>
+                                {isExportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule!, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className='w-4 h-4' /> Exportar General</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className='w-4 h-4' /> Exportar por Hora</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className='w-4 h-4' /> Exportar Plantilla</a>
                                     </div>
-                                )}
+                                </div>}
                             </div>
                             
                             {selectedServiceIds.size > 0 && view === 'schedule' && (
                                 <button onClick={handleToggleVisibilityForSelected} className={`flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
-                                    {visibilityAction.action === 'hide' ? <EyeOffIcon className='w-5 h-5'/> : <EyeIcon className='w-5 h-5'/>}
-                                    {visibilityAction.label} ({selectedServiceIds.size})
+                                    {visibilityAction.action === 'hide' ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                                    {`${visibilityAction.label} (${selectedServiceIds.size})`}
                                 </button>
                             )}
                         </div>
                     </div>
                 </div>
             </header>
-            <main className='container mx-auto p-4 sm:p-6 lg:p-8'>
+            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
                 {renderContent()}
             </main>
 

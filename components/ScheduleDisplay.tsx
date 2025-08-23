@@ -483,14 +483,45 @@ const DateSelector: React.FC<{
     displayDate: Date | null;
     onDateChange: (part: 'day' | 'month' | 'year', value: number) => void;
 }> = ({ displayDate, onDateChange }) => {
+    const [yearInput, setYearInput] = useState<string>('');
+    
+    useEffect(() => {
+        if (displayDate) {
+            setYearInput(displayDate.getFullYear().toString());
+        }
+    }, [displayDate]);
+
     if (!displayDate) {
         return null; // Don't render if date is not available yet
     }
-
+    
     const year = displayDate.getFullYear();
     const month = displayDate.getMonth();
     const day = displayDate.getDate();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setYearInput(e.target.value);
+    };
+
+    const handleYearBlur = () => {
+        const newYear = parseInt(yearInput, 10);
+        if (!isNaN(newYear) && newYear > 1000 && newYear < 9999) {
+            if(year !== newYear) {
+                onDateChange('year', newYear);
+            }
+        } else {
+            // If invalid, reset input to the current valid year from props
+            setYearInput(year.toString());
+        }
+    };
+    
+    const handleYearKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleYearBlur();
+            (e.target as HTMLInputElement).blur(); // remove focus
+        }
+    };
 
     return (
         <div className="flex items-center gap-2">
@@ -502,9 +533,15 @@ const DateSelector: React.FC<{
                 {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
             </select>
             <span className="text-gray-400">de</span>
-            <select value={year} onChange={(e) => onDateChange('year', parseInt(e.target.value))} className="bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white">
-                {Array.from({ length: 10 }, (_, i) => year - 5 + i).map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <input
+                type="number"
+                value={yearInput}
+                onChange={handleYearChange}
+                onBlur={handleYearBlur}
+                onKeyDown={handleYearKeyDown}
+                className="bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white w-24 text-center"
+                aria-label="Año"
+            />
         </div>
     );
 };

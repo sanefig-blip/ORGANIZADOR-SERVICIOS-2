@@ -443,29 +443,63 @@ const ServiceSection = ({ service, index, totalServices, isSelected, onUpdateSer
 const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 const DateSelector = ({ displayDate, onDateChange }) => {
+    const [yearInput, setYearInput] = useState('');
+    
+    useEffect(() => {
+        if (displayDate) {
+            setYearInput(displayDate.getFullYear().toString());
+        }
+    }, [displayDate]);
+
     if (!displayDate) {
         return null; // Don't render if date is not available yet
     }
-
+    
     const year = displayDate.getFullYear();
     const month = displayDate.getMonth();
     const day = displayDate.getDate();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    return (
-        React.createElement("div", { className: "flex items-center gap-2" },
-             React.createElement("select", { value: day, onChange: (e) => onDateChange('day', parseInt(e.target.value)), className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
-                Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => React.createElement("option", { key: d, value: d }, d))
-            ),
-            React.createElement("span", { className: "text-gray-400" }, "de"),
-            React.createElement("select", { value: month, onChange: (e) => onDateChange('month', parseInt(e.target.value)), className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
-                monthNames.map((m, i) => React.createElement("option", { key: i, value: i }, m))
-            ),
-            React.createElement("span", { className: "text-gray-400" }, "de"),
-            React.createElement("select", { value: year, onChange: (e) => onDateChange('year', parseInt(e.target.value)), className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
-                Array.from({ length: 10 }, (_, i) => year - 5 + i).map(y => React.createElement("option", { key: y, value: y }, y))
-            )
-        )
+    const handleYearChange = (e) => {
+        setYearInput(e.target.value);
+    };
+
+    const handleYearBlur = () => {
+        const newYear = parseInt(yearInput, 10);
+        if (!isNaN(newYear) && newYear > 1000 && newYear < 9999) {
+            if (year !== newYear) {
+                onDateChange('year', newYear);
+            }
+        } else {
+            setYearInput(year.toString());
+        }
+    };
+    
+    const handleYearKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleYearBlur();
+            e.target.blur();
+        }
+    };
+
+    return React.createElement("div", { className: "flex items-center gap-2" },
+        React.createElement("select", { value: day, onChange: (e) => onDateChange('day', parseInt(e.target.value)), className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
+            Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => React.createElement("option", { key: d, value: d }, d))
+        ),
+        React.createElement("span", { className: "text-gray-400" }, "de"),
+        React.createElement("select", { value: month, onChange: (e) => onDateChange('month', parseInt(e.target.value)), className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
+            monthNames.map((m, i) => React.createElement("option", { key: i, value: i }, m))
+        ),
+        React.createElement("span", { className: "text-gray-400" }, "de"),
+        React.createElement("input", {
+            type: "number",
+            value: yearInput,
+            onChange: handleYearChange,
+            onBlur: handleYearBlur,
+            onKeyDown: handleYearKeyDown,
+            className: "bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white w-24 text-center",
+            "aria-label": "Año"
+        })
     );
 };
 
