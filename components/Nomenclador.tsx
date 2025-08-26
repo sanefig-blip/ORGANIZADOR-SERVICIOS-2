@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon, BookmarkIcon, AnnotationIcon } from './icons';
 import { Personnel, Rank, RANKS, Roster, ServiceTemplate, Assignment } from '../types';
+import { organigramaImages } from '../data/organigramaImages';
 
 interface NomencladorProps {
   commandPersonnel: Personnel[];
@@ -872,6 +873,14 @@ const Nomenclador: React.FC<NomencladorProps> = (props) => {
 
   return (
     <div className="animate-fade-in space-y-8">
+        <div className="bg-gray-800/60 rounded-xl shadow-lg p-6 mb-8">
+            <h3 className="text-2xl font-bold text-white mb-4">Organigrama del Cuerpo de Bomberos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {organigramaImages.map((src, index) => (
+                    <img key={index} src={src} alt={`Organigrama parte ${index + 1}`} className="w-full h-auto rounded-lg shadow-md" />
+                ))}
+            </div>
+        </div>
         <RosterEditor 
           roster={props.roster}
           onUpdateRoster={props.onUpdateRoster}
