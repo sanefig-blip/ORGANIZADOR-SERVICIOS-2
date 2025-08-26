@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon } from './icons.js';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon, BookmarkIcon, AnnotationIcon } from './icons.js';
 import { RANKS } from '../types.js';
 
 const PersonnelListItem = ({ item, onUpdate, onRemove, extraFieldsToShow }) => {
@@ -517,14 +517,312 @@ const RosterEditor = ({ roster, onUpdateRoster, personnelList }) => {
   );
 };
 
+const ServiceTemplateManager = ({ templates, onAdd, onUpdate, onRemove, personnelList, unitList }) => {
+    const [editingTemplate, setEditingTemplate] = useState(null);
+
+    const handleSave = (templateToSave) => {
+        if (editingTemplate === 'new') {
+            onAdd(templateToSave);
+        } else {
+            onUpdate(templateToSave);
+        }
+        setEditingTemplate(null);
+    };
+
+    return (
+        React.createElement("div", { className: "bg-gray-800/60 rounded-xl shadow-lg p-6 mb-8" },
+            React.createElement("div", { className: "flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4" },
+                React.createElement("h3", { className: "text-2xl font-bold text-white flex items-center gap-3" },
+                    React.createElement(BookmarkIcon, { className: "w-6 h-6 text-yellow-300" }),
+                    "Gestión de Plantillas de Servicio"
+                ),
+                !editingTemplate && (
+                    React.createElement("button", { 
+                        onClick: () => setEditingTemplate('new'),
+                        className: "flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-md transition-colors"
+                    },
+                        React.createElement(PlusCircleIcon, { className: "w-5 h-5" }),
+                        "Crear Nueva Plantilla"
+                    )
+                )
+            ),
+
+            editingTemplate && (
+                React.createElement(TemplateEditorForm, {
+                    key: typeof editingTemplate === 'object' ? editingTemplate.templateId : 'new-template-editor',
+                    template: typeof editingTemplate === 'object' ? editingTemplate : null,
+                    onSave: handleSave,
+                    onCancel: () => setEditingTemplate(null),
+                    personnelList: personnelList,
+                    unitList: unitList
+                })
+            ),
+
+            React.createElement("div", { className: "mt-6 space-y-3" },
+                templates.map(template => (
+                     React.createElement("div", { key: template.templateId, className: "bg-gray-700/50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start gap-4" },
+                        React.createElement("div", { className: "flex-grow" },
+                            React.createElement("h4", { className: "font-bold text-lg text-yellow-300" }, template.title),
+                            template.description && React.createElement("p", { className: "text-sm text-gray-400 mt-1" }, template.description),
+                            template.novelty && (
+                                React.createElement("div", { className: "mt-2 p-2 bg-yellow-900/20 border-l-2 border-yellow-700 text-sm italic text-yellow-200" },
+                                    template.novelty
+                                )
+                            )
+                        ),
+                        React.createElement("div", { className: "flex items-center space-x-2 flex-shrink-0 self-end sm:self-center" },
+                            React.createElement("button", {
+                                onClick: () => setEditingTemplate(JSON.parse(JSON.stringify(template))),
+                                className: "p-2 text-gray-400 hover:text-yellow-400 transition-colors rounded-full hover:bg-gray-800",
+                                "aria-label": "Editar plantilla"
+                            },
+                                React.createElement(PencilIcon, { className: "w-5 h-5" })
+                            ),
+                            React.createElement("button", {
+                                onClick: () => {
+                                    if (window.confirm(`¿Seguro que quieres eliminar la plantilla "${template.title}"?`)) {
+                                        onRemove(template.templateId);
+                                    }
+                                },
+                                className: "p-2 text-gray-400 hover:text-red-400 transition-colors rounded-full hover:bg-gray-800",
+                                "aria-label": "Eliminar plantilla"
+                            },
+                                React.createElement(TrashIcon, { className: "w-5 h-5" })
+                            )
+                        )
+                    )
+                ))
+            )
+        )
+    );
+};
+
+const TemplateEditorForm = ({ template, onSave, onCancel, personnelList, unitList }) => {
+    const defaultTemplate = {
+        templateId: `new-template-${Date.now()}`,
+        id: `service-${Date.now()}`,
+        title: 'Nueva Plantilla de Servicio',
+        isHidden: false,
+        assignments: [],
+    };
+    
+    const [editableTemplate, setEditableTemplate] = useState(() => 
+        template ? JSON.parse(JSON.stringify(template)) : defaultTemplate
+    );
+    
+    const [personnelDropdownOpenFor, setPersonnelDropdownOpenFor] = useState(null);
+    const [personnelSearchTerm, setPersonnelSearchTerm] = useState('');
+    const personnelSearchInputRefs = useRef([]);
+
+    const handleInputChange = (e, assignmentIndex) => {
+        const { name, value } = e.target;
+        setEditableTemplate(prev => {
+            if (assignmentIndex !== undefined) {
+                const newAssignments = [...prev.assignments];
+                const currentAssignment = { ...newAssignments[assignmentIndex] };
+                currentAssignment[name] = value;
+                newAssignments[assignmentIndex] = currentAssignment;
+                return { ...prev, assignments: newAssignments };
+            }
+            return { ...prev, [name]: value };
+        });
+    };
+    
+    const handleAddAssignment = () => {
+        const newAssignment = {
+            id: `new-assign-${Date.now()}`, location: 'Nueva Ubicación', time: '00:00 Hs.',
+            implementationTime: '', personnel: 'A designar', details: [],
+        };
+        setEditableTemplate(prev => ({ ...prev, assignments: [...prev.assignments, newAssignment] }));
+    };
+    
+    const handleRemoveAssignment = (indexToRemove) => {
+        setEditableTemplate(prev => ({ ...prev, assignments: prev.assignments.filter((_, index) => index !== indexToRemove) }));
+    };
+
+    const handleDetailChange = (e, assignmentIndex, detailIndex) => {
+        const { value } = e.target;
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+            newDetails[detailIndex] = value;
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleAddDetail = (assignmentIndex) => {
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const currentDetails = newAssignments[assignmentIndex].details || [];
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: [...currentDetails, ''] };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleRemoveDetail = (assignmentIndex, detailIndex) => {
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+            newDetails.splice(detailIndex, 1);
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleAddPersonnelToDetails = (assignmentIndex, person) => {
+        const personDetailString = `${person.rank} L.P. ${person.id} ${person.name}`;
+        setEditableTemplate(prev => {
+            const newAssignments = prev.assignments.map((assignment, idx) => {
+                if (idx === assignmentIndex) {
+                    const currentDetails = Array.isArray(assignment.details) ? assignment.details.filter(d => d.trim() !== '') : [];
+                    return { ...assignment, details: [...currentDetails, personDetailString]};
+                }
+                return assignment;
+            });
+            return { ...prev, assignments: newAssignments };
+        });
+        setPersonnelSearchTerm('');
+        personnelSearchInputRefs.current[assignmentIndex]?.focus();
+    };
+
+    return (
+        React.createElement("div", { className: "bg-gray-900/50 rounded-xl shadow-lg mb-8 p-6 animate-fade-in border border-blue-800" },
+          React.createElement("h3", { className: "text-xl sm:text-2xl font-bold text-white mb-4" },
+              template ? 'Editando Plantilla' : 'Creando Nueva Plantilla'
+          ),
+          React.createElement("div", { className: "space-y-4 mb-6" },
+            React.createElement("div", null,
+              React.createElement("label", { htmlFor: `title-${editableTemplate.templateId}`, className: "block text-sm font-medium text-gray-300 mb-1" }, "Título de la Plantilla"),
+              React.createElement("input", {
+                  type: "text", id: `title-${editableTemplate.templateId}`, name: "title", value: editableTemplate.title, onChange: handleInputChange,
+                  className: "w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              })
+            ),
+            React.createElement("div", null,
+              React.createElement("label", { htmlFor: `description-${editableTemplate.templateId}`, className: "block text-sm font-medium text-gray-300 mb-1" }, "Descripción (Opcional)"),
+              React.createElement("textarea", {
+                  id: `description-${editableTemplate.templateId}`, name: "description", value: editableTemplate.description || '', onChange: handleInputChange, rows: 2,
+                  className: "w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              })
+            ),
+            React.createElement("div", null,
+              React.createElement("label", { htmlFor: `novelty-${editableTemplate.templateId}`, className: "block text-sm font-medium text-gray-300 mb-1" }, "Novedad (Opcional)"),
+              React.createElement("textarea", {
+                  id: `novelty-${editableTemplate.templateId}`, name: "novelty", value: editableTemplate.novelty || '', onChange: handleInputChange, rows: 3,
+                  className: "w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              })
+            )
+          ),
+          React.createElement("div", { className: "flex justify-between items-center mb-4 border-t border-gray-700 pt-4" },
+            React.createElement("h4", { className: "text-lg font-semibold text-yellow-300" }, "Asignaciones de la Plantilla"),
+            React.createElement("button", { onClick: handleAddAssignment, className: "flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-500 text-white font-medium rounded-md transition-colors text-sm" },
+                React.createElement(PlusCircleIcon, { className: "w-4 h-4" }), " Añadir Asignación"
+            )
+          ),
+          React.createElement("div", { className: "space-y-6" },
+              editableTemplate.assignments.length === 0 ? (
+                  React.createElement("div", { className: "text-center py-4 text-gray-500" }, "No hay asignaciones para esta plantilla.")
+              ) : ( editableTemplate.assignments.map((assignment, index) => (
+                  React.createElement("div", { key: assignment.id, className: "bg-gray-800/60 p-4 rounded-lg border border-gray-700 relative" },
+                      React.createElement("button", { onClick: () => handleRemoveAssignment(index), className: "absolute top-2 right-2 text-gray-500 hover:text-red-400 p-1 rounded-full bg-gray-900/50 hover:bg-gray-800 transition-colors", "aria-label": "Eliminar asignación" },
+                          React.createElement(TrashIcon, { className: "w-5 h-5" })
+                      ),
+                      React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 pr-8" },
+                          React.createElement("div", { className: "md:col-span-2" },
+                              React.createElement("label", { htmlFor: `location-${index}-${editableTemplate.id}`, className: "text-sm text-gray-400" }, "Ubicación"),
+                              React.createElement("input", { type: "text", id: `location-${index}-${editableTemplate.id}`, name: "location", value: assignment.location, onChange: (e) => handleInputChange(e, index), className: "mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" })
+                          ),
+                          React.createElement("div", null,
+                              React.createElement("label", { htmlFor: `time-${index}-${editableTemplate.id}`, className: "text-sm text-gray-400" }, "Horario de Servicio"),
+                              React.createElement("input", { type: "text", id: `time-${index}-${editableTemplate.id}`, name: "time", value: assignment.time, onChange: (e) => handleInputChange(e, index), className: "mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" })
+                          ),
+                          React.createElement("div", null,
+                              React.createElement("label", { htmlFor: `implementationTime-${index}-${editableTemplate.id}`, className: "text-sm text-gray-400" }, "Horario de Implantación"),
+                              React.createElement("input", { type: "text", id: `implementationTime-${index}-${editableTemplate.id}`, name: "implementationTime", value: assignment.implementationTime || '', onChange: (e) => handleInputChange(e, index), className: "mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" })
+                          ),
+                          React.createElement("div", { className: "md:col-span-2" },
+                              React.createElement("label", { htmlFor: `personnel-${index}-${editableTemplate.id}`, className: "text-sm text-gray-400" }, "Personal"),
+                              React.createElement("input", { type: "text", id: `personnel-${index}-${editableTemplate.id}`, name: "personnel", value: assignment.personnel, onChange: (e) => handleInputChange(e, index), className: "mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" })
+                          ),
+                          React.createElement("div", { className: "md:col-span-2" },
+                              React.createElement("label", { htmlFor: `unit-${index}-${editableTemplate.id}`, className: "text-sm text-gray-400" }, "Unidad (Opcional)"),
+                              React.createElement("select", { id: `unit-${index}-${editableTemplate.id}`, name: "unit", value: assignment.unit || '', onChange: (e) => handleInputChange(e, index), className: "mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" },
+                                  React.createElement("option", { value: "" }, "Ninguna"),
+                                  unitList.map(u => React.createElement("option", { key: u, value: u }, u))
+                              )
+                          ),
+                          React.createElement("div", { className: "md:col-span-2" },
+                              React.createElement("div", { className: "flex justify-between items-center mb-1" },
+                                  React.createElement("label", { className: "text-sm text-gray-400" }, "Detalles y Personal Adicional"),
+                                  React.createElement("button", { type: "button", onClick: () => personnelSearchInputRefs.current[index]?.focus(), className: "flex items-center gap-1 text-xs px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-medium transition-colors" },
+                                      React.createElement(PlusCircleIcon, { className: "w-4 h-4" }), " Añadir Personal"
+                                  )
+                              ),
+                              React.createElement("div", { className: "relative" },
+                                  React.createElement("input", { type: "text", placeholder: "Buscar personal para añadir a detalles...", ref: el => { personnelSearchInputRefs.current[index] = el; }, value: personnelSearchTerm, onChange: e => setPersonnelSearchTerm(e.target.value), onFocus: () => setPersonnelDropdownOpenFor(index), onBlur: () => setTimeout(() => setPersonnelDropdownOpenFor(null), 200), className: "w-full bg-gray-700 border-gray-600 rounded-md px-3 py-2 text-white mb-2" }),
+                                  personnelDropdownOpenFor === index && (
+                                      React.createElement("div", { className: "absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto" },
+                                          React.createElement("ul", { className: "divide-y divide-gray-700" },
+                                              personnelList.filter(p => p.name.toLowerCase().includes(personnelSearchTerm.toLowerCase()) || p.rank.toLowerCase().includes(personnelSearchTerm.toLowerCase()) || p.id.toLowerCase().includes(personnelSearchTerm.toLowerCase())).map(p => (
+                                                  React.createElement("li", { key: p.id, onMouseDown: () => handleAddPersonnelToDetails(index, p), className: "px-4 py-2 hover:bg-gray-700 cursor-pointer text-sm text-gray-300 flex justify-between items-center" },
+                                                      React.createElement("div", null, React.createElement("div", { className: "font-bold text-white" }, p.name), React.createElement("div", { className: "text-xs text-yellow-400" }, p.rank)),
+                                                      React.createElement("div", { className: "text-xs text-gray-400 font-mono" }, "L.P. ", p.id)
+                                                  )
+                                              ))
+                                          )
+                                      )
+                                  )
+                              ),
+                              React.createElement("div", { className: "space-y-2" },
+                                (assignment.details || []).map((detail, detailIndex) => (
+                                    React.createElement("div", { key: detailIndex, className: "flex items-center gap-2 animate-fade-in" },
+                                        React.createElement("input", { type: "text", value: detail, onChange: (e) => handleDetailChange(e, index, detailIndex), className: "w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white", placeholder: `Línea de detalle ${detailIndex + 1}` }),
+                                        React.createElement("button", { type: "button", onClick: () => handleRemoveDetail(index, detailIndex), className: "p-1 text-gray-400 hover:text-red-400 rounded-full hover:bg-gray-800 transition-colors", "aria-label": "Eliminar detalle" }, React.createElement(TrashIcon, { className: "w-5 h-5" }))
+                                    )
+                                ))
+                              ),
+                              React.createElement("button", { type: "button", onClick: () => handleAddDetail(index), className: "mt-3 flex items-center gap-2 text-xs px-2 py-1 bg-sky-600 hover:bg-sky-500 rounded-md text-white font-medium transition-colors" },
+                                  React.createElement(PlusCircleIcon, { className: "w-4 h-4" }), " Añadir Línea de Detalle"
+                              )
+                          )
+                      )
+                  )
+              ))
+          )),
+          React.createElement("div", { className: "flex justify-end space-x-4 mt-8" },
+              React.createElement("button", { onClick: onCancel, className: "flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white transition-colors" },
+                  React.createElement(XCircleIcon, { className: "w-5 h-5 mr-2" }), " Cancelar"
+              ),
+              React.createElement("button", { onClick: () => onSave(editableTemplate), className: "flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors" },
+                  React.createElement(PencilIcon, { className: "w-5 h-5 mr-2" }), " Guardar Plantilla"
+              )
+          )
+        )
+    );
+};
 
 const Nomenclador = (props) => {
+   const allPersonnel = useMemo(() => {
+    const combined = [...props.servicePersonnel, ...props.commandPersonnel];
+    const uniquePersonnel = Array.from(new Map(combined.map(p => [p.id, p])).values());
+    return uniquePersonnel.sort((a, b) => a.name.localeCompare(b.name));
+  }, [props.servicePersonnel, props.commandPersonnel]);
+
   return (
     React.createElement("div", { className: "animate-fade-in space-y-8" },
         React.createElement(RosterEditor, { 
           roster: props.roster,
           onUpdateRoster: props.onUpdateRoster,
           personnelList: props.commandPersonnel
+        }),
+        React.createElement(ServiceTemplateManager, {
+            templates: props.serviceTemplates,
+            onAdd: props.onAddTemplate,
+            onUpdate: props.onUpdateTemplate,
+            onRemove: props.onRemoveTemplate,
+            personnelList: allPersonnel,
+            unitList: props.units
         }),
         React.createElement("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-8" },
             React.createElement(EditablePersonnelList, {

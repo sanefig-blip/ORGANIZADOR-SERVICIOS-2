@@ -267,7 +267,7 @@ const App = () => {
         else newSelection.add(serviceId);
         setSelectedServiceIds(newSelection);
     };
-
+    
     const serviceMatches = (service, term) => {
         if (!term) return true;
         if (service.title?.toLowerCase().includes(term)) return true;
@@ -294,6 +294,7 @@ const App = () => {
         
         return { ...schedule, services: filteredServices, sportsEvents: filteredSportsEvents };
     }, [schedule, searchTerm]);
+
 
     const handleSelectAllServices = (selectAll) => {
         if (!filteredSchedule) return;
@@ -541,8 +542,20 @@ const App = () => {
     };
 
     const handleDeleteTemplate = (templateId) => {
-        const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId)
+        const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId);
         updateAndSaveTemplates(newTemplates);
+        showToast(`Plantilla eliminada.`);
+    };
+
+    const handleAddTemplate = (template) => {
+        const newTemplate = { ...template, templateId: `template-${Date.now()}` };
+        updateAndSaveTemplates([...serviceTemplates, newTemplate]);
+        showToast(`Plantilla "${template.title}" creada.`);
+    };
+
+    const handleUpdateTemplate = (updatedTemplate) => {
+        updateAndSaveTemplates(serviceTemplates.map(t => t.templateId === updatedTemplate.templateId ? updatedTemplate : t));
+        showToast(`Plantilla "${updatedTemplate.title}" actualizada.`);
     };
 
     const handleExportAsTemplate = (format) => {
@@ -601,7 +614,11 @@ const App = () => {
                     commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, units: unitList, roster: roster,
                     onAddCommandPersonnel: (item) => updateAndSaveCommandPersonnel([...commandPersonnel, item]), onUpdateCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p)), onRemoveCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id)),
                     onAddServicePersonnel: (item) => updateAndSaveServicePersonnel([...servicePersonnel, item]), onUpdateServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p)), onRemoveServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id)),
-                    onUpdateUnits: updateAndSaveUnits, onUpdateRoster: updateAndSaveRoster
+                    onUpdateUnits: updateAndSaveUnits, onUpdateRoster: updateAndSaveRoster,
+                    serviceTemplates: serviceTemplates,
+                    onAddTemplate: handleAddTemplate,
+                    onUpdateTemplate: handleUpdateTemplate,
+                    onRemoveTemplate: handleDeleteTemplate
                  });
             default:
                 return null;

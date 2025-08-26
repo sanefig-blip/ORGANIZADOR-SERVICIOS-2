@@ -1,7 +1,6 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon } from './icons';
-import { Personnel, Rank, RANKS, Roster } from '../types';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon, BookmarkIcon, AnnotationIcon } from './icons';
+import { Personnel, Rank, RANKS, Roster, ServiceTemplate, Assignment } from '../types';
 
 interface NomencladorProps {
   commandPersonnel: Personnel[];
@@ -19,6 +18,11 @@ interface NomencladorProps {
 
   roster: Roster;
   onUpdateRoster: (roster: Roster) => void;
+
+  serviceTemplates: ServiceTemplate[];
+  onAddTemplate: (template: ServiceTemplate) => void;
+  onUpdateTemplate: (template: ServiceTemplate) => void;
+  onRemoveTemplate: (templateId: string) => void;
 }
 
 type ExtraField = 'station' | 'detachment' | 'poc' | 'part';
@@ -558,13 +562,328 @@ const RosterEditor: React.FC<{
 };
 
 
+const ServiceTemplateManager: React.FC<{
+    templates: ServiceTemplate[];
+    onAdd: (template: ServiceTemplate) => void;
+    onUpdate: (template: ServiceTemplate) => void;
+    onRemove: (templateId: string) => void;
+    personnelList: Personnel[];
+    unitList: string[];
+}> = ({ templates, onAdd, onUpdate, onRemove, personnelList, unitList }) => {
+    const [editingTemplate, setEditingTemplate] = useState<ServiceTemplate | 'new' | null>(null);
+
+    const handleSave = (templateToSave: ServiceTemplate) => {
+        if (editingTemplate === 'new') {
+            onAdd(templateToSave);
+        } else {
+            onUpdate(templateToSave);
+        }
+        setEditingTemplate(null);
+    };
+
+    return (
+        <div className="bg-gray-800/60 rounded-xl shadow-lg p-6 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <BookmarkIcon className="w-6 h-6 text-yellow-300"/>
+                    Gestión de Plantillas de Servicio
+                </h3>
+                {!editingTemplate && (
+                    <button 
+                        onClick={() => setEditingTemplate('new')}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-md transition-colors"
+                    >
+                        <PlusCircleIcon className="w-5 h-5" />
+                        Crear Nueva Plantilla
+                    </button>
+                )}
+            </div>
+
+            {editingTemplate && (
+                <TemplateEditorForm
+                    key={typeof editingTemplate === 'object' ? editingTemplate.templateId : 'new-template-editor'}
+                    template={typeof editingTemplate === 'object' ? editingTemplate : null}
+                    onSave={handleSave}
+                    onCancel={() => setEditingTemplate(null)}
+                    personnelList={personnelList}
+                    unitList={unitList}
+                />
+            )}
+
+            <div className="mt-6 space-y-3">
+                {templates.map(template => (
+                     <div key={template.templateId} className="bg-gray-700/50 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="flex-grow">
+                            <h4 className="font-bold text-lg text-yellow-300">{template.title}</h4>
+                            {template.description && <p className="text-sm text-gray-400 mt-1">{template.description}</p>}
+                            {template.novelty && (
+                                <div className="mt-2 p-2 bg-yellow-900/20 border-l-2 border-yellow-700 text-sm italic text-yellow-200">
+                                    {template.novelty}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center space-x-2 flex-shrink-0 self-end sm:self-center">
+                            <button
+                                onClick={() => setEditingTemplate(JSON.parse(JSON.stringify(template)))}
+                                className="p-2 text-gray-400 hover:text-yellow-400 transition-colors rounded-full hover:bg-gray-800"
+                                aria-label="Editar plantilla"
+                            >
+                                <PencilIcon className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (window.confirm(`¿Seguro que quieres eliminar la plantilla "${template.title}"?`)) {
+                                        onRemove(template.templateId);
+                                    }
+                                }}
+                                className="p-2 text-gray-400 hover:text-red-400 transition-colors rounded-full hover:bg-gray-800"
+                                aria-label="Eliminar plantilla"
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const TemplateEditorForm: React.FC<{
+    template: ServiceTemplate | null;
+    onSave: (template: ServiceTemplate) => void;
+    onCancel: () => void;
+    personnelList: Personnel[];
+    unitList: string[];
+}> = ({ template, onSave, onCancel, personnelList, unitList }) => {
+    const defaultTemplate: ServiceTemplate = {
+        templateId: `new-template-${Date.now()}`,
+        id: `service-${Date.now()}`,
+        title: 'Nueva Plantilla de Servicio',
+        isHidden: false,
+        assignments: [],
+    };
+    
+    const [editableTemplate, setEditableTemplate] = useState<ServiceTemplate>(() => 
+        template ? JSON.parse(JSON.stringify(template)) : defaultTemplate
+    );
+    
+    const [personnelDropdownOpenFor, setPersonnelDropdownOpenFor] = useState<number | null>(null);
+    const [personnelSearchTerm, setPersonnelSearchTerm] = useState('');
+    const personnelSearchInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, assignmentIndex?: number) => {
+        const { name, value } = e.target;
+        setEditableTemplate(prev => {
+            if (assignmentIndex !== undefined) {
+                const newAssignments = [...prev.assignments];
+                const currentAssignment = { ...newAssignments[assignmentIndex] };
+                (currentAssignment as any)[name] = value;
+                newAssignments[assignmentIndex] = currentAssignment;
+                return { ...prev, assignments: newAssignments };
+            }
+            return { ...prev, [name]: value };
+        });
+    };
+    
+    const handleAddAssignment = () => {
+        const newAssignment: Assignment = {
+            id: `new-assign-${Date.now()}`, location: 'Nueva Ubicación', time: '00:00 Hs.',
+            implementationTime: '', personnel: 'A designar', details: [],
+        };
+        setEditableTemplate(prev => ({ ...prev, assignments: [...prev.assignments, newAssignment] }));
+    };
+    
+    const handleRemoveAssignment = (indexToRemove: number) => {
+        setEditableTemplate(prev => ({ ...prev, assignments: prev.assignments.filter((_, index) => index !== indexToRemove) }));
+    };
+
+    const handleDetailChange = (e: React.ChangeEvent<HTMLInputElement>, assignmentIndex: number, detailIndex: number) => {
+        const { value } = e.target;
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+            newDetails[detailIndex] = value;
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleAddDetail = (assignmentIndex: number) => {
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const currentDetails = newAssignments[assignmentIndex].details || [];
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: [...currentDetails, ''] };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleRemoveDetail = (assignmentIndex: number, detailIndex: number) => {
+        setEditableTemplate(prev => {
+            const newAssignments = [...prev.assignments];
+            const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+            newDetails.splice(detailIndex, 1);
+            newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+            return { ...prev, assignments: newAssignments };
+        });
+    };
+
+    const handleAddPersonnelToDetails = (assignmentIndex: number, person: Personnel) => {
+        const personDetailString = `${person.rank} L.P. ${person.id} ${person.name}`;
+        setEditableTemplate(prev => {
+            const newAssignments = prev.assignments.map((assignment, idx) => {
+                if (idx === assignmentIndex) {
+                    const currentDetails = Array.isArray(assignment.details) ? assignment.details.filter(d => d.trim() !== '') : [];
+                    return { ...assignment, details: [...currentDetails, personDetailString]};
+                }
+                return assignment;
+            });
+            return { ...prev, assignments: newAssignments };
+        });
+        setPersonnelSearchTerm('');
+        personnelSearchInputRefs.current[assignmentIndex]?.focus();
+    };
+
+    return (
+        <div className="bg-gray-900/50 rounded-xl shadow-lg mb-8 p-6 animate-fade-in border border-blue-800">
+          <h3 className="text-xl sm:text-2xl font-bold text-white mb-4">
+              {template ? 'Editando Plantilla' : 'Creando Nueva Plantilla'}
+          </h3>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label htmlFor={`title-${editableTemplate.templateId}`} className="block text-sm font-medium text-gray-300 mb-1">Título de la Plantilla</label>
+              <input
+                  type="text" id={`title-${editableTemplate.templateId}`} name="title" value={editableTemplate.title} onChange={handleInputChange}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor={`description-${editableTemplate.templateId}`} className="block text-sm font-medium text-gray-300 mb-1">Descripción (Opcional)</label>
+              <textarea
+                  id={`description-${editableTemplate.templateId}`} name="description" value={editableTemplate.description || ''} onChange={handleInputChange} rows={2}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor={`novelty-${editableTemplate.templateId}`} className="block text-sm font-medium text-gray-300 mb-1">Novedad (Opcional)</label>
+              <textarea
+                  id={`novelty-${editableTemplate.templateId}`} name="novelty" value={editableTemplate.novelty || ''} onChange={handleInputChange} rows={3}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex justify-between items-center mb-4 border-t border-gray-700 pt-4">
+            <h4 className="text-lg font-semibold text-yellow-300">Asignaciones de la Plantilla</h4>
+            <button onClick={handleAddAssignment} className="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-500 text-white font-medium rounded-md transition-colors text-sm">
+                <PlusCircleIcon className="w-4 h-4" /> Añadir Asignación
+            </button>
+          </div>
+          <div className="space-y-6">
+              {editableTemplate.assignments.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500">No hay asignaciones para esta plantilla.</div>
+              ) : ( editableTemplate.assignments.map((assignment, index) => (
+                  <div key={assignment.id} className="bg-gray-800/60 p-4 rounded-lg border border-gray-700 relative">
+                      <button onClick={() => handleRemoveAssignment(index)} className="absolute top-2 right-2 text-gray-500 hover:text-red-400 p-1 rounded-full bg-gray-900/50 hover:bg-gray-800 transition-colors" aria-label="Eliminar asignación">
+                          <TrashIcon className="w-5 h-5" />
+                      </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-8">
+                          {/* Location, Time, Implementation Time, Personnel, Unit */}
+                           <div className="md:col-span-2">
+                              <label htmlFor={`location-${index}-${editableTemplate.id}`} className="text-sm text-gray-400">Ubicación</label>
+                              <input type="text" id={`location-${index}-${editableTemplate.id}`} name="location" value={assignment.location} onChange={(e) => handleInputChange(e, index)} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"/>
+                          </div>
+                          <div>
+                              <label htmlFor={`time-${index}-${editableTemplate.id}`} className="text-sm text-gray-400">Horario de Servicio</label>
+                              <input type="text" id={`time-${index}-${editableTemplate.id}`} name="time" value={assignment.time} onChange={(e) => handleInputChange(e, index)} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"/>
+                          </div>
+                          <div>
+                              <label htmlFor={`implementationTime-${index}-${editableTemplate.id}`} className="text-sm text-gray-400">Horario de Implantación</label>
+                              <input type="text" id={`implementationTime-${index}-${editableTemplate.id}`} name="implementationTime" value={assignment.implementationTime || ''} onChange={(e) => handleInputChange(e, index)} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"/>
+                          </div>
+                          <div className="md:col-span-2">
+                              <label htmlFor={`personnel-${index}-${editableTemplate.id}`} className="text-sm text-gray-400">Personal</label>
+                              <input type="text" id={`personnel-${index}-${editableTemplate.id}`} name="personnel" value={assignment.personnel} onChange={(e) => handleInputChange(e, index)} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"/>
+                          </div>
+                          <div className="md:col-span-2">
+                              <label htmlFor={`unit-${index}-${editableTemplate.id}`} className="text-sm text-gray-400">Unidad (Opcional)</label>
+                              <select id={`unit-${index}-${editableTemplate.id}`} name="unit" value={assignment.unit || ''} onChange={(e) => handleInputChange(e, index)} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white">
+                                  <option value="">Ninguna</option>
+                                  {unitList.map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                          </div>
+                          <div className="md:col-span-2">
+                              <div className="flex justify-between items-center mb-1">
+                                  <label className="text-sm text-gray-400">Detalles y Personal Adicional</label>
+                                  <button type="button" onClick={() => personnelSearchInputRefs.current[index]?.focus()} className="flex items-center gap-1 text-xs px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-medium transition-colors">
+                                      <PlusCircleIcon className="w-4 h-4" /> Añadir Personal
+                                  </button>
+                              </div>
+                              <div className="relative">
+                                  <input type="text" placeholder="Buscar personal para añadir a detalles..." ref={el => { personnelSearchInputRefs.current[index] = el; }} value={personnelSearchTerm} onChange={e => setPersonnelSearchTerm(e.target.value)} onFocus={() => setPersonnelDropdownOpenFor(index)} onBlur={() => setTimeout(() => setPersonnelDropdownOpenFor(null), 200)} className="w-full bg-gray-700 border-gray-600 rounded-md px-3 py-2 text-white mb-2" />
+                                  {personnelDropdownOpenFor === index && (
+                                      <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                          <ul className="divide-y divide-gray-700">
+                                              {personnelList.filter(p => p.name.toLowerCase().includes(personnelSearchTerm.toLowerCase()) || p.rank.toLowerCase().includes(personnelSearchTerm.toLowerCase()) || p.id.toLowerCase().includes(personnelSearchTerm.toLowerCase())).map(p => (
+                                                  <li key={p.id} onMouseDown={() => handleAddPersonnelToDetails(index, p)} className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-sm text-gray-300 flex justify-between items-center">
+                                                      <div><div className="font-bold text-white">{p.name}</div><div className="text-xs text-yellow-400">{p.rank}</div></div>
+                                                      <div className="text-xs text-gray-400 font-mono">L.P. {p.id}</div>
+                                                  </li>
+                                              ))}
+                                          </ul>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="space-y-2">
+                                {(assignment.details || []).map((detail, detailIndex) => (
+                                    <div key={detailIndex} className="flex items-center gap-2 animate-fade-in">
+                                        <input type="text" value={detail} onChange={(e) => handleDetailChange(e, index, detailIndex)} className="w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white" placeholder={`Línea de detalle ${detailIndex + 1}`} />
+                                        <button type="button" onClick={() => handleRemoveDetail(index, detailIndex)} className="p-1 text-gray-400 hover:text-red-400 rounded-full hover:bg-gray-800 transition-colors" aria-label="Eliminar detalle"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                ))}
+                              </div>
+                              <button type="button" onClick={() => handleAddDetail(index)} className="mt-3 flex items-center gap-2 text-xs px-2 py-1 bg-sky-600 hover:bg-sky-500 rounded-md text-white font-medium transition-colors">
+                                  <PlusCircleIcon className="w-4 h-4" /> Añadir Línea de Detalle
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              ))
+          )}
+          </div>
+          <div className="flex justify-end space-x-4 mt-8">
+              <button onClick={onCancel} className="flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md text-white transition-colors">
+                  <XCircleIcon className="w-5 h-5 mr-2"/> Cancelar
+              </button>
+              <button onClick={() => onSave(editableTemplate)} className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors">
+                  <PencilIcon className="w-5 h-5 mr-2"/> Guardar Plantilla
+              </button>
+          </div>
+        </div>
+    );
+};
+
+
 const Nomenclador: React.FC<NomencladorProps> = (props) => {
+   const allPersonnel = useMemo(() => {
+    const combined = [...props.servicePersonnel, ...props.commandPersonnel];
+    const uniquePersonnel = Array.from(new Map(combined.map(p => [p.id, p])).values());
+    return uniquePersonnel.sort((a, b) => a.name.localeCompare(b.name));
+  }, [props.servicePersonnel, props.commandPersonnel]);
+
   return (
     <div className="animate-fade-in space-y-8">
         <RosterEditor 
           roster={props.roster}
           onUpdateRoster={props.onUpdateRoster}
           personnelList={props.commandPersonnel}
+        />
+        <ServiceTemplateManager
+            templates={props.serviceTemplates}
+            onAdd={props.onAddTemplate}
+            onUpdate={props.onUpdateTemplate}
+            onRemove={props.onRemoveTemplate}
+            personnelList={allPersonnel}
+            unitList={props.units}
         />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <EditablePersonnelList

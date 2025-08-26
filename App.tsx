@@ -544,6 +544,18 @@ const App: React.FC = () => {
     const handleDeleteTemplate = (templateId: string) => {
         const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId)
         updateAndSaveTemplates(newTemplates);
+        showToast(`Plantilla eliminada.`);
+    };
+    
+    const handleAddTemplate = (template: ServiceTemplate) => {
+        const newTemplate = { ...template, templateId: `template-${Date.now()}` };
+        updateAndSaveTemplates([...serviceTemplates, newTemplate]);
+        showToast(`Plantilla "${template.title}" creada.`);
+    };
+
+    const handleUpdateTemplate = (updatedTemplate: ServiceTemplate) => {
+        updateAndSaveTemplates(serviceTemplates.map(t => t.templateId === updatedTemplate.templateId ? updatedTemplate : t));
+        showToast(`Plantilla "${updatedTemplate.title}" actualizada.`);
     };
 
     const handleExportAsTemplate = (format: 'excel' | 'word') => {
@@ -603,6 +615,10 @@ const App: React.FC = () => {
                     onAddCommandPersonnel={(item) => updateAndSaveCommandPersonnel([...commandPersonnel, item])} onUpdateCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p))} onRemoveCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id))}
                     onAddServicePersonnel={(item) => updateAndSaveServicePersonnel([...servicePersonnel, item])} onUpdateServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p))} onRemoveServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id))}
                     onUpdateUnits={updateAndSaveUnits} onUpdateRoster={updateAndSaveRoster}
+                    serviceTemplates={serviceTemplates}
+                    onAddTemplate={handleAddTemplate}
+                    onUpdateTemplate={handleUpdateTemplate}
+                    onRemoveTemplate={handleDeleteTemplate}
                  />;
             default:
                 return null;
