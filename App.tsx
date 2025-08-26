@@ -3,6 +3,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -426,8 +428,22 @@ const App: React.FC = () => {
                 let newSchedule = JSON.parse(JSON.stringify(prevSchedule));
 
                 if (importMode === '1') { // Add
-                    newSchedule.services = [...prevSchedule.services, ...newServices];
-                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents, ...newSportsEvents];
+                    const now = Date.now();
+                    let counter = 0;
+                    const reIdService = (service: Service): Service => ({
+                        ...service,
+                        id: `imported-add-${now}-${counter++}`,
+                        assignments: service.assignments.map(assignment => ({
+                            ...assignment,
+                            id: `imported-add-assign-${now}-${counter++}`
+                        }))
+                    });
+
+                    const uniqueNewServices = newServices.map(reIdService);
+                    const uniqueNewSportsEvents = newSportsEvents.map(reIdService);
+
+                    newSchedule.services = [...prevSchedule.services, ...uniqueNewServices];
+                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents, ...uniqueNewSportsEvents];
                     alert(`${newServices.length + newSportsEvents.length} servicio(s) importado(s) y añadidos con éxito.`);
                 } else { // Replace
                     if (importedData.date) newSchedule.date = importedData.date;
