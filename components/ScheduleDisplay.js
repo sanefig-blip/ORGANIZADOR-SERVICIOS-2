@@ -1,13 +1,9 @@
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RANKS } from '../types.js';
 import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon, SearchIcon } from './icons.js';
 import AssignmentCard from './AssignmentCard.js';
 
-const ServiceSection = ({ service, index, totalServices, isSelected, onUpdateService, onMoveService, onToggleSelection, onSaveAsTemplate, onReplaceFromTemplate, commandPersonnel, servicePersonnel, unitList }) => {
+const ServiceSection = ({ service, index, totalServices, isSelected, onUpdateService, onMoveService, onDeleteService, onToggleSelection, onSaveAsTemplate, onReplaceFromTemplate, commandPersonnel, servicePersonnel, unitList }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editableService, setEditableService] = useState(() => JSON.parse(JSON.stringify(service)));
@@ -433,6 +429,13 @@ const ServiceSection = ({ service, index, totalServices, isSelected, onUpdateSer
                     "aria-label": "Editar servicio"
                 },
                     React.createElement(PencilIcon, { className: "w-5 h-5" })
+                ),
+                React.createElement("button", { 
+                    onClick: onDeleteService,
+                    className: "p-2 rounded-full text-gray-400 hover:bg-red-800/50 hover:text-red-400 transition-colors",
+                    "aria-label": "Eliminar servicio"
+                },
+                    React.createElement(TrashIcon, { className: "w-5 h-5" })
                 )
             )
         ),
@@ -548,7 +551,7 @@ const isValidLp = (id) => {
 
 
 const ScheduleDisplay = (props) => {
-  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine, searchTerm, onSearchChange } = props;
+  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onDeleteService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine, searchTerm, onSearchChange } = props;
   const [isEditingStaff, setIsEditingStaff] = useState(false);
   const [editableStaff, setEditableStaff] = useState([]);
   
@@ -770,6 +773,7 @@ const ScheduleDisplay = (props) => {
             isSelected: selectedServiceIds.has(service.id),
             onUpdateService: (s) => onUpdateService(s, 'common'), 
             onMoveService: (id, dir) => onMoveService(id, dir, 'common'),
+            onDeleteService: () => onDeleteService(service.id, 'common'),
             onToggleSelection: onToggleServiceSelection,
             onSaveAsTemplate: onSaveAsTemplate,
             onReplaceFromTemplate: (id) => onReplaceFromTemplate(id, 'common'),
@@ -806,6 +810,7 @@ const ScheduleDisplay = (props) => {
                 isSelected: selectedServiceIds.has(service.id),
                 onUpdateService: (s) => onUpdateService(s, 'sports'), 
                 onMoveService: (id, dir) => onMoveService(id, dir, 'sports'),
+                onDeleteService: () => onDeleteService(service.id, 'sports'),
                 onToggleSelection: onToggleServiceSelection,
                 onSaveAsTemplate: onSaveAsTemplate,
                 onReplaceFromTemplate: (id) => onReplaceFromTemplate(id, 'sports'),

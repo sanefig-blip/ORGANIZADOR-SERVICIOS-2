@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -236,6 +229,35 @@ const App: React.FC = () => {
             const newSchedule = { ...prevSchedule, [key]: services };
             localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
             return newSchedule;
+        });
+    };
+
+    const handleDeleteService = (serviceId: string, type: 'common' | 'sports') => {
+        setSchedule(prevSchedule => {
+            if (!prevSchedule) return null;
+
+            const listKey = type === 'common' ? 'services' : 'sportsEvents';
+            const serviceToDelete = prevSchedule[listKey].find(s => s.id === serviceId);
+
+            if (!serviceToDelete) return prevSchedule;
+
+            if (window.confirm(`¿Estás seguro de que quieres eliminar el servicio "${serviceToDelete.title}"? Esta acción no se puede deshacer.`)) {
+                const newSchedule = {
+                    ...prevSchedule,
+                    [listKey]: prevSchedule[listKey].filter(s => s.id !== serviceId),
+                };
+                localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+
+                setSelectedServiceIds(currentIds => {
+                    const newIds = new Set(currentIds);
+                    newIds.delete(serviceId);
+                    return newIds;
+                });
+                
+                showToast(`Servicio "${serviceToDelete.title}" eliminado.`);
+                return newSchedule;
+            }
+            return prevSchedule;
         });
     };
 
@@ -570,6 +592,7 @@ const App: React.FC = () => {
                 return <ScheduleDisplay
                     schedule={filteredSchedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
                     onDateChange={handleDateChange} onUpdateService={handleUpdateService} onUpdateCommandStaff={handleUpdateCommandStaff} onAddNewService={handleAddNewService} onMoveService={handleMoveService} onToggleServiceSelection={handleToggleServiceSelection} onSelectAllServices={handleSelectAllServices} onSaveAsTemplate={handleSaveAsTemplate} onReplaceFromTemplate={(serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId })} onImportGuardLine={() => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule.commandStaff, commandPersonnel), true)}
+                    onDeleteService={handleDeleteService}
                     searchTerm={searchTerm} onSearchChange={setSearchTerm}
                 />;
             case 'time-grouped':

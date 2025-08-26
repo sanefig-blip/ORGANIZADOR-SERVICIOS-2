@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Schedule, Officer, Service, Assignment, Personnel, RANKS, Rank } from '../types';
 import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon, SearchIcon } from './icons';
@@ -16,6 +12,7 @@ interface ScheduleDisplayProps {
   onUpdateCommandStaff: (updatedStaff: Officer[]) => void;
   onAddNewService: (type: 'common' | 'sports') => void;
   onMoveService: (serviceId: string, direction: 'up' | 'down', type: 'common' | 'sports') => void;
+  onDeleteService: (serviceId: string, type: 'common' | 'sports') => void;
   onToggleServiceSelection: (serviceId: string) => void;
   onSelectAllServices: (selectAll: boolean) => void;
   onSaveAsTemplate: (service: Service) => void;
@@ -35,6 +32,7 @@ interface ServiceSectionProps {
   isSelected: boolean;
   onUpdateService: (updatedService: Service) => void;
   onMoveService: (serviceId: string, direction: 'up' | 'down') => void;
+  onDeleteService: () => void;
   onToggleSelection: (serviceId: string) => void;
   onSaveAsTemplate: (service: Service) => void;
   onReplaceFromTemplate: (serviceId: string) => void;
@@ -43,7 +41,7 @@ interface ServiceSectionProps {
   unitList: string[];
 }
 
-const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalServices, isSelected, onUpdateService, onMoveService, onToggleSelection, onSaveAsTemplate, onReplaceFromTemplate, commandPersonnel, servicePersonnel, unitList }) => {
+const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalServices, isSelected, onUpdateService, onMoveService, onDeleteService, onToggleSelection, onSaveAsTemplate, onReplaceFromTemplate, commandPersonnel, servicePersonnel, unitList }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editableService, setEditableService] = useState<Service>(() => JSON.parse(JSON.stringify(service)));
@@ -473,6 +471,13 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
                 >
                     <PencilIcon className="w-5 h-5" />
                 </button>
+                <button 
+                    onClick={onDeleteService}
+                    className="p-2 rounded-full text-gray-400 hover:bg-red-800/50 hover:text-red-400 transition-colors"
+                    aria-label="Eliminar servicio"
+                >
+                    <TrashIcon className="w-5 h-5" />
+                </button>
             </div>
         </div>
 
@@ -593,7 +598,7 @@ const isValidLp = (id?: string) => {
 
 
 const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
-  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine, searchTerm, onSearchChange } = props;
+  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onDeleteService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine, searchTerm, onSearchChange } = props;
   const [isEditingStaff, setIsEditingStaff] = useState(false);
   const [editableStaff, setEditableStaff] = useState<Officer[]>([]);
   
@@ -815,6 +820,7 @@ const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
             isSelected={selectedServiceIds.has(service.id)}
             onUpdateService={(s) => onUpdateService(s, 'common')} 
             onMoveService={(id, dir) => onMoveService(id, dir, 'common')}
+            onDeleteService={() => onDeleteService(service.id, 'common')}
             onToggleSelection={onToggleServiceSelection}
             onSaveAsTemplate={onSaveAsTemplate}
             onReplaceFromTemplate={(id) => onReplaceFromTemplate(id, 'common')}
@@ -851,6 +857,7 @@ const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
                 isSelected={selectedServiceIds.has(service.id)}
                 onUpdateService={(s) => onUpdateService(s, 'sports')} 
                 onMoveService={(id, dir) => onMoveService(id, dir, 'sports')}
+                onDeleteService={() => onDeleteService(service.id, 'sports')}
                 onToggleSelection={onToggleServiceSelection}
                 onSaveAsTemplate={onSaveAsTemplate}
                 onReplaceFromTemplate={(id) => onReplaceFromTemplate(id, 'sports')}
