@@ -165,19 +165,10 @@ const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
             continue;
         }
         
-        if (line.toUpperCase().includes('EVENTOS DEPORTIVOS')) {
+        if (line.toUpperCase().trim() === 'EVENTOS DEPORTIVOS') {
             commitAssignment();
             currentService = null;
             isParsingSportsEvents = true;
-            const service: Service = {
-              id: `service-imported-${Date.now()}-sports`,
-              title: "EVENTOS DEPORTIVOS",
-              description: "",
-              isHidden: false,
-              assignments: [],
-            };
-            schedule.sportsEvents!.push(service);
-            currentService = service;
             continue;
         }
 
