@@ -1,4 +1,5 @@
 
+
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { Service, Assignment, Schedule, Officer, Rank } from '../types';
@@ -172,33 +173,32 @@ const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
             continue;
         }
 
-        const serviceMatch = line.match(/^(\d+)\s*-\s*O\.S\s*[\d/]+\s*[–-]?\s*“?([^”]+)”?\s*(\(.*\))?/i);
-        if (serviceMatch) {
+        const markedTitleMatch = line.match(/^SERVICE_TITLE_MARKER::(.*)/i);
+        const serviceMatch = !markedTitleMatch && line.match(/^(\d+)\s*-\s*O\.S\s*[\d/]+\s*[–-]?\s*“?([^”]+)”?\s*(\(.*\))?/i);
+        const altServiceMatch = !markedTitleMatch && !serviceMatch && line.match(/^\d+\s*-\s*SERVICIO PREVENCIONAL\s*-\s*"(.*)"/i);
+
+        if (markedTitleMatch || serviceMatch || altServiceMatch) {
             commitAssignment();
             currentService = null;
-            const title = `${serviceMatch[2].trim()} ${serviceMatch[3] ? serviceMatch[3].trim() : ''}`.trim();
+            
+            let title = '';
+            let description = '';
+
+            if (markedTitleMatch) {
+                title = markedTitleMatch[1].trim();
+            } else if (serviceMatch) {
+                title = `${serviceMatch[2].trim()} ${serviceMatch[3] ? serviceMatch[3].trim() : ''}`.trim();
+                description = line.match(/O\.S\s*[\d/]+/i)?.[0] || '';
+            } else if (altServiceMatch) {
+                title = altServiceMatch[1].trim();
+            }
+
             const service: Service = {
                 id: `service-imported-${Date.now()}-${title.slice(0, 10)}`,
                 title: title,
-                description: line.match(/O\.S\s*[\d/]+/i)?.[0] || '',
+                description: description,
                 isHidden: false,
                 assignments: [],
-            };
-            (isParsingSportsEvents ? schedule.sportsEvents! : schedule.services!).push(service);
-            currentService = service;
-            continue;
-        }
-
-        const altServiceMatch = line.match(/^\d+\s*-\s*SERVICIO PREVENCIONAL\s*-\s*"(.*)"/i);
-        if (altServiceMatch) {
-            commitAssignment();
-            currentService = null;
-            const title = altServiceMatch[1].trim();
-            const service: Service = {
-                id: `service-imported-${Date.now()}-${title.slice(0,10)}`,
-                title: title,
-                isHidden: false,
-                assignments: []
             };
             (isParsingSportsEvents ? schedule.sportsEvents! : schedule.services!).push(service);
             currentService = service;

@@ -101,7 +101,7 @@ export const exportScheduleToWord = (schedule) => {
             const assignmentsContent = service.assignments.flatMap(assignment => createAssignmentParagraphs(assignment, false));
 
             const serviceParagraphs = [
-                new Paragraph({ text: service.title, style: "Heading2" }),
+                new Paragraph({ text: `SERVICE_TITLE_MARKER::${service.title}`, style: "Heading2" }),
                 ...(service.description ? [new Paragraph({
                     children: [new TextRun({ text: service.description, ...ITALIC_CONTENT_STYLE })],
                     spacing: { after: 100 }
