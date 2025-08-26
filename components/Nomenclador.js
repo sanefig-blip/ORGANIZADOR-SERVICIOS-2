@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { TrashIcon, PlusCircleIcon, PencilIcon, XCircleIcon, GripVerticalIcon, ArrowLeftIcon, ArrowRightIcon, BookmarkIcon, AnnotationIcon } from './icons.js';
 import { RANKS } from '../types.js';
-import { organigramaImages } from '../data/organigramaImages.js';
 
 const PersonnelListItem = ({ item, onUpdate, onRemove, extraFieldsToShow }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -812,14 +811,6 @@ const Nomenclador = (props) => {
 
   return (
     React.createElement("div", { className: "animate-fade-in space-y-8" },
-        React.createElement("div", { className: "bg-gray-800/60 rounded-xl shadow-lg p-6 mb-8" },
-            React.createElement("h3", { className: "text-2xl font-bold text-white mb-4" }, "Organigrama del Cuerpo de Bomberos"),
-            React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
-                organigramaImages.map((src, index) => (
-                    React.createElement("img", { key: index, src: src, alt: `Organigrama parte ${index + 1}`, className: "w-full h-auto rounded-lg shadow-md" })
-                ))
-            )
-        ),
         React.createElement(RosterEditor, { 
           roster: props.roster,
           onUpdateRoster: props.onUpdateRoster,
