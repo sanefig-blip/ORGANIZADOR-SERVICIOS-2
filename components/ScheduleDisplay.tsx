@@ -1,8 +1,10 @@
 
 
+
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Schedule, Officer, Service, Assignment, Personnel, RANKS, Rank } from '../types';
-import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon } from './icons';
+import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon, SearchIcon } from './icons';
 import AssignmentCard from './AssignmentCard';
 
 interface ScheduleDisplayProps {
@@ -22,6 +24,8 @@ interface ScheduleDisplayProps {
   commandPersonnel: Personnel[];
   servicePersonnel: Personnel[];
   unitList: string[];
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
 }
 
 interface ServiceSectionProps {
@@ -45,8 +49,8 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
   const [editableService, setEditableService] = useState<Service>(() => JSON.parse(JSON.stringify(service)));
   const [personnelDropdownOpenFor, setPersonnelDropdownOpenFor] = useState<number | null>(null);
   const [personnelSearchTerm, setPersonnelSearchTerm] = useState('');
-  const personnelDropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
-
+  const personnelSearchInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
   const serviceId = `service-content-${service.id}`;
   
   const allPersonnel = useMemo(() => {
@@ -59,23 +63,6 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
     setEditableService(JSON.parse(JSON.stringify(service)));
   }, [service]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (
-            personnelDropdownOpenFor !== null &&
-            personnelDropdownRefs.current[personnelDropdownOpenFor] &&
-            !personnelDropdownRefs.current[personnelDropdownOpenFor]!.contains(event.target as Node)
-        ) {
-            setPersonnelDropdownOpenFor(null);
-        }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [personnelDropdownOpenFor]);
-
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, assignmentIndex?: number) => {
     const { name, value } = e.target;
     
@@ -83,13 +70,7 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
       if (assignmentIndex !== undefined) {
         const newAssignments = [...prev.assignments];
         const currentAssignment = { ...newAssignments[assignmentIndex] };
-
-        if (name === 'details') {
-          currentAssignment.details = value.split('\n');
-        } else {
-          (currentAssignment as any)[name] = value;
-        }
-
+        (currentAssignment as any)[name] = value;
         newAssignments[assignmentIndex] = currentAssignment;
         return { ...prev, assignments: newAssignments };
       }
@@ -99,21 +80,21 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
 
   const handleAddPersonnelToDetails = (assignmentIndex: number, person: Personnel) => {
     const personDetailString = `${person.rank} L.P. ${person.id} ${person.name}`;
-    
     setEditableService(prev => {
-        const newAssignments = [...prev.assignments];
-        const assignment = { ...newAssignments[assignmentIndex] };
-        
-        const currentDetails = Array.isArray(assignment.details) ? assignment.details : [];
-        const newDetails = [...currentDetails, personDetailString];
-
-        assignment.details = newDetails;
-        newAssignments[assignmentIndex] = assignment;
+        const newAssignments = prev.assignments.map((assignment, idx) => {
+            if (idx === assignmentIndex) {
+                const currentDetails = Array.isArray(assignment.details) ? assignment.details.filter(d => d.trim() !== '') : [];
+                return {
+                    ...assignment,
+                    details: [...currentDetails, personDetailString]
+                };
+            }
+            return assignment;
+        });
         return { ...prev, assignments: newAssignments };
     });
-
-    setPersonnelDropdownOpenFor(null);
     setPersonnelSearchTerm('');
+    personnelSearchInputRefs.current[assignmentIndex]?.focus();
   };
 
   const handleAddAssignment = () => {
@@ -137,6 +118,37 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
           assignments: prev.assignments.filter((_, index) => index !== indexToRemove),
       }));
   };
+
+  const handleDetailChange = (e: React.ChangeEvent<HTMLInputElement>, assignmentIndex: number, detailIndex: number) => {
+    const { value } = e.target;
+    setEditableService(prev => {
+        const newAssignments = [...prev.assignments];
+        const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+        newDetails[detailIndex] = value;
+        newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+        return { ...prev, assignments: newAssignments };
+    });
+  };
+
+  const handleAddDetail = (assignmentIndex: number) => {
+    setEditableService(prev => {
+        const newAssignments = [...prev.assignments];
+        const currentDetails = newAssignments[assignmentIndex].details || [];
+        newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: [...currentDetails, ''] };
+        return { ...prev, assignments: newAssignments };
+    });
+  };
+
+  const handleRemoveDetail = (assignmentIndex: number, detailIndex: number) => {
+    setEditableService(prev => {
+        const newAssignments = [...prev.assignments];
+        const newDetails = [...(newAssignments[assignmentIndex].details || [])];
+        newDetails.splice(detailIndex, 1);
+        newAssignments[assignmentIndex] = { ...newAssignments[assignmentIndex], details: newDetails };
+        return { ...prev, assignments: newAssignments };
+    });
+  };
+
 
   const handleSave = () => {
     onUpdateService(editableService);
@@ -302,33 +314,31 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
                             {unitList.filter(u => u !== assignment.unit).map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
                     </div>
-                     <div className="md:col-span-2 relative" ref={el => {personnelDropdownRefs.current[index] = el}}>
+                    <div className="md:col-span-2">
                         <div className="flex justify-between items-center mb-1">
-                            <label htmlFor={`details-${index}-${service.id}`} className="text-sm text-gray-400">Detalles (Opcional)</label>
-                            <button
+                            <label className="text-sm text-gray-400">Detalles y Personal Adicional</label>
+                             <button
                                 type="button"
-                                onClick={() => {
-                                    setPersonnelDropdownOpenFor(personnelDropdownOpenFor === index ? null : index);
-                                    setPersonnelSearchTerm('');
-                                }}
+                                onClick={() => personnelSearchInputRefs.current[index]?.focus()}
                                 className="flex items-center gap-1 text-xs px-2 py-1 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-medium transition-colors"
                             >
                                 <PlusCircleIcon className="w-4 h-4" />
-                                Añadir Personal
+                                Añadir Personal por Búsqueda
                             </button>
                         </div>
-                        {personnelDropdownOpenFor === index && (
-                            <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                <div className="p-2 sticky top-0 bg-gray-800">
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar personal..."
-                                        value={personnelSearchTerm}
-                                        onChange={e => setPersonnelSearchTerm(e.target.value)}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white"
-                                        autoFocus
-                                    />
-                                </div>
+                         <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Buscar personal para añadir a detalles..."
+                                ref={el => { personnelSearchInputRefs.current[index] = el; }}
+                                value={personnelSearchTerm}
+                                onChange={e => setPersonnelSearchTerm(e.target.value)}
+                                onFocus={() => setPersonnelDropdownOpenFor(index)}
+                                onBlur={() => setTimeout(() => setPersonnelDropdownOpenFor(null), 200)}
+                                className="w-full bg-gray-700 border-gray-600 rounded-md px-3 py-2 text-white mb-2"
+                            />
+                            {personnelDropdownOpenFor === index && (
+                               <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                                 <ul className="divide-y divide-gray-700">
                                     {allPersonnel
                                         .filter(p => 
@@ -339,7 +349,7 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
                                         .map(p => (
                                             <li
                                                 key={p.id}
-                                                onClick={() => handleAddPersonnelToDetails(index, p)}
+                                                onMouseDown={() => handleAddPersonnelToDetails(index, p)}
                                                 className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-sm text-gray-300 flex justify-between items-center"
                                             >
                                                 <div>
@@ -351,9 +361,39 @@ const ServiceSection: React.FC<ServiceSectionProps> = ({ service, index, totalSe
                                         ))
                                     }
                                 </ul>
-                            </div>
-                        )}
-                        <textarea id={`details-${index}-${service.id}`} name="details" value={(assignment.details || []).join('\n')} onChange={(e) => handleInputChange(e, index)} rows={3} className="mt-1 w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"/>
+                               </div>
+                            )}
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {(assignment.details || []).map((detail, detailIndex) => (
+                              <div key={detailIndex} className="flex items-center gap-2 animate-fade-in">
+                                  <input
+                                      type="text"
+                                      value={detail}
+                                      onChange={(e) => handleDetailChange(e, index, detailIndex)}
+                                      className="w-full bg-gray-700 border-gray-600 rounded-md px-2 py-1 text-white"
+                                      placeholder={`Línea de detalle ${detailIndex + 1}`}
+                                  />
+                                  <button
+                                      type="button"
+                                      onClick={() => handleRemoveDetail(index, detailIndex)}
+                                      className="p-1 text-gray-400 hover:text-red-400 rounded-full hover:bg-gray-800 transition-colors"
+                                      aria-label="Eliminar detalle"
+                                  >
+                                      <TrashIcon className="w-5 h-5" />
+                                  </button>
+                              </div>
+                          ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handleAddDetail(index)}
+                            className="mt-3 flex items-center gap-2 text-xs px-2 py-1 bg-sky-600 hover:bg-sky-500 rounded-md text-white font-medium transition-colors"
+                        >
+                            <PlusCircleIcon className="w-4 h-4" />
+                            Añadir Línea de Detalle
+                        </button>
                     </div>
                 </div>
             </div>
@@ -553,7 +593,7 @@ const isValidLp = (id?: string) => {
 
 
 const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
-  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine } = props;
+  const { schedule, displayDate, selectedServiceIds, onDateChange, onUpdateService, onUpdateCommandStaff, onAddNewService, onMoveService, onToggleServiceSelection, onSelectAllServices, commandPersonnel, servicePersonnel, unitList, onSaveAsTemplate, onReplaceFromTemplate, onImportGuardLine, searchTerm, onSearchChange } = props;
   const [isEditingStaff, setIsEditingStaff] = useState(false);
   const [editableStaff, setEditableStaff] = useState<Officer[]>([]);
   
@@ -752,6 +792,17 @@ const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
                     className="h-5 w-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
                 />
                 <label htmlFor="select-all-services" className="text-gray-300">Seleccionar Todos Visibles</label>
+            </div>
+            <div className="relative flex-grow sm:flex-grow-0 min-w-[250px]">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                <input
+                    type="text"
+                    placeholder="Buscar en servicios..."
+                    value={searchTerm}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    className="w-full bg-gray-700/80 border-gray-600 rounded-md pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
+                    aria-label="Buscar servicios"
+                />
             </div>
         </div>
         

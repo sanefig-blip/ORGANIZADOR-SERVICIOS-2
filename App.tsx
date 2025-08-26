@@ -1,3 +1,8 @@
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -7,12 +12,11 @@ import { servicePersonnelData as defaultServicePersonnel } from './data/serviceP
 import { defaultUnits } from './data/unitData.ts';
 import { defaultServiceTemplates } from './data/serviceTemplates.ts';
 import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate, exportExcelTemplate, exportWordTemplate } from './services/exportService.ts';
-import { parseServicesFromWord } from './services/wordImportService.ts';
+import { parseScheduleFromFile } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
 import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon } from './components/icons.tsx';
-import * as XLSX from 'xlsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';
@@ -28,6 +32,7 @@ const parseDateFromString = (dateString: string): Date => {
       const year = parseInt(parts[2], 10);
       if (!isNaN(day) && month !== undefined && !isNaN(year)) return new Date(year, month, day);
     }
+    console.warn("Could not parse date from string:", dateString);
     return new Date();
 };
 
@@ -42,6 +47,7 @@ const App: React.FC = () => {
     const [selectedServiceIds, setSelectedServiceIds] = useState(new Set<string>());
     const [serviceTemplates, setServiceTemplates] = useState<ServiceTemplate[]>([]);
     const [roster, setRoster] = useState<Roster>({});
+    const [searchTerm, setSearchTerm] = useState('');
 
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
     const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
@@ -146,15 +152,13 @@ const App: React.FC = () => {
         const loadedCommandPersonnel = JSON.parse(localStorage.getItem('commandPersonnel') || JSON.stringify(defaultCommandPersonnel));
         const loadedRoster = JSON.parse(localStorage.getItem('rosterData') || JSON.stringify(preloadedRosterData));
           
-        dataCopy.commandStaff = loadGuardLineFromRoster(loadedDate, dataCopy.commandStaff, loadedCommandPersonnel);
-          
         setSchedule(dataCopy);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
         setUnitList(JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits)));
         setServiceTemplates(JSON.parse(localStorage.getItem('serviceTemplates') || JSON.stringify(defaultServiceTemplates)));
         setRoster(loadedRoster);
-    }, [loadGuardLineFromRoster]);
+    }, []);
 
     const sortPersonnel = (a: Personnel, b: Personnel) => {
         const rankComparison = (rankOrder[a.rank] || 99) - (rankOrder[b.rank] || 99);
@@ -239,16 +243,50 @@ const App: React.FC = () => {
         else newSelection.add(serviceId);
         setSelectedServiceIds(newSelection);
     };
+    
+    const serviceMatches = (service: Service, term: string): boolean => {
+        if (!term) return true;
+        if (service.title?.toLowerCase().includes(term)) return true;
+        if (service.description?.toLowerCase().includes(term)) return true;
+        if (service.novelty?.toLowerCase().includes(term)) return true;
+    
+        for (const assignment of service.assignments) {
+            if (assignment.location?.toLowerCase().includes(term)) return true;
+            if (assignment.personnel?.toLowerCase().includes(term)) return true;
+            if (assignment.unit?.toLowerCase().includes(term)) return true;
+            if (assignment.details?.join(' ').toLowerCase().includes(term)) return true;
+        }
+        return false;
+    };
+
+    const filteredSchedule = useMemo(() => {
+        if (!schedule) return null;
+        if (!searchTerm) return schedule;
+    
+        const lowercasedFilter = searchTerm.toLowerCase();
+    
+        const filteredServices = schedule.services.filter(s => serviceMatches(s, lowercasedFilter));
+        const filteredSportsEvents = schedule.sportsEvents.filter(s => serviceMatches(s, lowercasedFilter));
+        
+        return { ...schedule, services: filteredServices, sportsEvents: filteredSportsEvents };
+    }, [schedule, searchTerm]);
+
 
     const handleSelectAllServices = (selectAll: boolean) => {
-        if (!schedule) return;
+        if (!filteredSchedule) return;
+
+        const visibleFilteredIds = [...filteredSchedule.services, ...filteredSchedule.sportsEvents]
+            .filter(s => !s.isHidden)
+            .map(s => s.id);
+
+        const newSelection = new Set(selectedServiceIds);
+
         if (selectAll) {
-            const allVisibleIds = [...schedule.services, ...schedule.sportsEvents].filter(s => !s.isHidden).map(s => s.id);
-            setSelectedServiceIds(new Set(allVisibleIds));
+            visibleFilteredIds.forEach(id => newSelection.add(id));
         } else {
-            const hiddenSelected = [...selectedServiceIds].filter(id => [...schedule.services, ...schedule.sportsEvents].find(s => s.id === id)?.isHidden);
-            setSelectedServiceIds(new Set(hiddenSelected));
+            visibleFilteredIds.forEach(id => newSelection.delete(id));
         }
+        setSelectedServiceIds(newSelection);
     };
 
     const handleToggleVisibilityForSelected = () => {
@@ -308,37 +346,29 @@ const App: React.FC = () => {
                 day = daysInTargetMonth;
             }
 
-            return new Date(year, month, day);
+            const newDate = new Date(year, month, day);
+
+            setSchedule(prevSchedule => {
+                if (!prevSchedule) return prevSchedule;
+        
+                const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+                const newDateString = `${newDate.getDate()} DE ${monthNames[newDate.getMonth()]} DE ${newDate.getFullYear()}`;
+                const newCommandStaff = loadGuardLineFromRoster(newDate, prevSchedule.commandStaff, commandPersonnel);
+                
+                const newSchedule = { 
+                    ...prevSchedule, 
+                    date: newDateString, 
+                    commandStaff: newCommandStaff 
+                };
+                
+                localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
+                
+                return newSchedule;
+            });
+
+            return newDate;
         });
     };
-
-    useEffect(() => {
-        if (!displayDate) return;
-    
-        setSchedule(prevSchedule => {
-            if (!prevSchedule) return prevSchedule;
-    
-            const monthNames = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-            const newDateString = `${displayDate.getDate()} DE ${monthNames[displayDate.getMonth()]} DE ${displayDate.getFullYear()}`;
-            const newCommandStaff = loadGuardLineFromRoster(displayDate, prevSchedule.commandStaff, commandPersonnel);
-            
-            const scheduleNeedsUpdate = prevSchedule.date !== newDateString || JSON.stringify(prevSchedule.commandStaff) !== JSON.stringify(newCommandStaff);
-
-            if (!scheduleNeedsUpdate) {
-                return prevSchedule;
-            }
-            
-            const newSchedule = { 
-                ...prevSchedule, 
-                date: newDateString, 
-                commandStaff: newCommandStaff 
-            };
-            
-            localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
-            
-            return newSchedule;
-        });
-    }, [displayDate, commandPersonnel, loadGuardLineFromRoster]);
 
     const handleUpdateCommandStaff = useCallback((updatedStaff: Officer[], isAutoUpdate = false) => {
         if (!isAutoUpdate) {
@@ -381,49 +411,35 @@ const App: React.FC = () => {
             return;
         }
         try {
-            let newServices: Service[] = [];
-            const fileExtension = file.name.split('.').pop()?.toLowerCase();
             const fileBuffer = await file.arrayBuffer();
-            if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-                const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-                const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const servicesMap = new Map<string, Service>();
-                json.forEach((row) => {
-                    const serviceTitle = row['Título del Servicio']?.trim();
-                    if (!serviceTitle) return;
-                    if (!servicesMap.has(serviceTitle)) {
-                        servicesMap.set(serviceTitle, { id: `imported-excel-${Date.now()}-${servicesMap.size}`, title: serviceTitle, description: row['Descripción del Servicio'] || '', novelty: row['Novedad del Servicio'] || '', isHidden: false, assignments: [] });
-                    }
-                    const service = servicesMap.get(serviceTitle)!;
-                    const location = row['Ubicación de Asignación'], time = row['Horario de Asignación'], personnel = row['Personal de Asignación'];
-                    if (location && time && personnel) {
-                        const allDetailsRaw = row['Detalles de Asignación'] ? String(row['Detalles de Asignación']).split(/;|\n/g).map(d => d.trim()).filter(d => d) : [];
-                        const implementationTimeValue = allDetailsRaw.find(d => d.toUpperCase().startsWith('HORARIO DE IMPLANTACION'));
-                        const otherDetails = allDetailsRaw.filter(d => !d.toUpperCase().startsWith('HORARIO DE IMPLANTACION'));
-                        service.assignments.push({ id: `imported-assign-${Date.now()}-${service.assignments.length}`, location: String(location), time: String(time), personnel: String(personnel), unit: row['Unidad de Asignación'] ? String(row['Unidad de Asignación']) : undefined, implementationTime: implementationTimeValue, details: otherDetails });
-                    }
-                });
-                newServices = Array.from(servicesMap.values());
-            } else if (fileExtension === 'docx') {
-                 newServices = await parseServicesFromWord(fileBuffer);
-            } else {
-                alert("Formato de archivo no soportado."); return;
+            const importedData = await parseScheduleFromFile(fileBuffer, file.name);
+
+            if (!importedData || (!importedData.services?.length && !importedData.sportsEvents?.length)) {
+                alert("No se encontraron servicios válidos en el archivo o el formato no es reconocido.");
+                return;
             }
-            if (newServices.length === 0) { alert("No se encontraron servicios válidos en el archivo."); return; }
+            
+            const { services: newServices = [], sportsEvents: newSportsEvents = [] } = importedData;
             
             setSchedule(prevSchedule => {
                 if (!prevSchedule) return null;
-                const importedSportsEvents = newServices.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-                const importedCommonServices = newServices.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO'));
-                let newSchedule = { ...prevSchedule };
+                let newSchedule = JSON.parse(JSON.stringify(prevSchedule));
+
                 if (importMode === '1') { // Add
-                    newSchedule.services = [...prevSchedule.services.filter(s => !s.isHidden), ...importedCommonServices, ...prevSchedule.services.filter(s => s.isHidden)];
-                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents.filter(s => !s.isHidden), ...importedSportsEvents, ...prevSchedule.sportsEvents.filter(s => s.isHidden)];
-                    alert(`${newServices.length} servicio(s) importado(s) y añadidos con éxito.`);
+                    newSchedule.services = [...prevSchedule.services, ...newServices];
+                    newSchedule.sportsEvents = [...prevSchedule.sportsEvents, ...newSportsEvents];
+                    alert(`${newServices.length + newSportsEvents.length} servicio(s) importado(s) y añadidos con éxito.`);
                 } else { // Replace
-                    newSchedule.services = importedCommonServices;
-                    newSchedule.sportsEvents = importedSportsEvents;
-                    alert(`El horario ha sido reemplazado. ${newServices.length} servicio(s) importado(s) con éxito.`);
+                    if (importedData.date) newSchedule.date = importedData.date;
+                    if (importedData.commandStaff) newSchedule.commandStaff = importedData.commandStaff;
+                    newSchedule.services = newServices;
+                    newSchedule.sportsEvents = newSportsEvents;
+                    
+                    if(importedData.date) {
+                        const newDisplayDate = parseDateFromString(importedData.date);
+                        setDisplayDate(newDisplayDate);
+                    }
+                    alert(`El horario ha sido reemplazado. ${newServices.length + newSportsEvents.length} servicio(s) importado(s) con éxito.`);
                 }
                 localStorage.setItem('scheduleData', JSON.stringify(newSchedule));
                 return newSchedule;
@@ -507,9 +523,9 @@ const App: React.FC = () => {
     };
 
     const getAssignmentsByTime = useMemo(() => {
-        if (!schedule) return {};
+        if (!filteredSchedule) return {};
         const grouped: { [key: string]: Assignment[] } = {};
-        [...schedule.services, ...schedule.sportsEvents].filter(s => !s.isHidden).forEach(service => {
+        [...filteredSchedule.services, ...filteredSchedule.sportsEvents].filter(s => !s.isHidden).forEach(service => {
           service.assignments.forEach(assignment => {
             const timeKey = assignment.time;
             if (!grouped[timeKey]) grouped[timeKey] = [];
@@ -517,7 +533,7 @@ const App: React.FC = () => {
           });
         });
         return grouped;
-    }, [schedule]);
+    }, [filteredSchedule]);
     
     const openTemplateModal = (props: any) => {
         setTemplateModalProps(props);
@@ -532,12 +548,13 @@ const App: React.FC = () => {
     }, [selectedServiceIds, schedule]);
 
     const renderContent = () => {
-        if (!schedule || !displayDate) return null;
+        if (!filteredSchedule || !displayDate) return null;
         switch (view) {
             case 'schedule':
                 return <ScheduleDisplay
-                    schedule={schedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
+                    schedule={filteredSchedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
                     onDateChange={handleDateChange} onUpdateService={handleUpdateService} onUpdateCommandStaff={handleUpdateCommandStaff} onAddNewService={handleAddNewService} onMoveService={handleMoveService} onToggleServiceSelection={handleToggleServiceSelection} onSelectAllServices={handleSelectAllServices} onSaveAsTemplate={handleSaveAsTemplate} onReplaceFromTemplate={(serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId })} onImportGuardLine={() => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule.commandStaff, commandPersonnel), true)}
+                    searchTerm={searchTerm} onSearchChange={setSearchTerm}
                 />;
             case 'time-grouped':
                 return <TimeGroupedScheduleDisplay assignmentsByTime={getAssignmentsByTime} onAssignmentStatusChange={handleAssignmentStatusChange} />;
@@ -561,7 +578,7 @@ const App: React.FC = () => {
 
     return (
         <div className="bg-gray-900 text-white min-h-screen font-sans">
-            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx" />
+            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx,.ods" />
             <input type="file" ref={rosterInputRef} onChange={handleRosterImport} style={{ display: 'none' }} accept=".json" />
             <header className="bg-gray-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -605,7 +622,7 @@ const App: React.FC = () => {
                                 </button>
                                 {isExportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
                                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule!, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
+                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
                                             <DownloadIcon className='w-4 h-4' /> Exportar General</a>
                                         <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
                                             <DownloadIcon className='w-4 h-4' /> Exportar por Hora</a>
