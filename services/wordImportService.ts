@@ -254,7 +254,7 @@ const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
 };
 
 const parseSimpleTemplate = (lines: string[]): Partial<Schedule> => {
-    const servicesMap = new Map<string, Service>();
+    const services: Service[] = [];
     let currentService: Service | null = null;
     let currentAssignment: Partial<Assignment> & { tempDetails?: string[] } = {};
 
@@ -283,10 +283,13 @@ const parseSimpleTemplate = (lines: string[]): Partial<Schedule> => {
 
         if (key === 'Título del Servicio') {
             commitAssignment();
-            if (!servicesMap.has(value)) {
-                servicesMap.set(value, { id: `imported-word-service-${Date.now()}-${servicesMap.size}`, title: value, assignments: [], isHidden: false });
-            }
-            currentService = servicesMap.get(value)!;
+            currentService = {
+                id: `imported-word-service-${Date.now()}-${services.length}`,
+                title: value,
+                assignments: [],
+                isHidden: false,
+            };
+            services.push(currentService);
         } else if (currentService) {
             switch (key) {
                 case 'Descripción del Servicio': currentService.description = value; break;
@@ -307,7 +310,6 @@ const parseSimpleTemplate = (lines: string[]): Partial<Schedule> => {
     });
     commitAssignment();
 
-    const services = Array.from(servicesMap.values());
     return {
         services: services.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO')),
         sportsEvents: services.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO')),
