@@ -4,6 +4,14 @@ import { ClockIcon, UsersIcon, LocationMarkerIcon, ClipboardListIcon, Annotation
 const AssignmentCard = ({ assignment, onStatusChange }) => {
     const otherDetails = assignment.details || [];
 
+    const cardClasses = [
+        "bg-gray-800 p-4 rounded-lg border border-gray-700 transform hover:scale-[1.02] transition-transform duration-200 h-full flex flex-col",
+        assignment.inService && !assignment.serviceEnded ? "border-l-4 border-green-500" : "",
+        assignment.serviceEnded ? "opacity-60 border-l-4 border-red-700" : ""
+    ].join(" ").trim();
+
+    const textStrikeThroughClass = assignment.serviceEnded ? "line-through" : "";
+
     const getPersonnelStyle = () => {
         if (assignment.serviceEnded) {
             return { text: 'line-through text-red-400', icon: 'text-red-400' };
@@ -17,14 +25,14 @@ const AssignmentCard = ({ assignment, onStatusChange }) => {
     const personnelStyle = getPersonnelStyle();
 
     return (
-        React.createElement("div", { className: "bg-gray-800 p-4 rounded-lg border border-gray-700 transform hover:scale-[1.02] transition-transform duration-200 h-full flex flex-col" },
+        React.createElement("div", { className: cardClasses },
             assignment.serviceTitle && (
               React.createElement("div", { className: "flex items-center mb-2 text-sm text-blue-300/80" },
                 React.createElement(ClipboardListIcon, { className: "w-4 h-4 mr-2" }),
-                React.createElement("span", null, assignment.serviceTitle)
+                React.createElement("span", { className: textStrikeThroughClass }, assignment.serviceTitle)
               )
             ),
-            React.createElement("h4", { className: "font-bold text-lg text-yellow-300" }, assignment.location),
+            React.createElement("h4", { className: `font-bold text-lg text-yellow-300 ${textStrikeThroughClass}` }, assignment.location),
             
             assignment.novelty && (
                 React.createElement("div", { className: "mt-3 p-3 bg-yellow-900/40 border border-yellow-700 rounded-md" },
@@ -35,16 +43,16 @@ const AssignmentCard = ({ assignment, onStatusChange }) => {
                 )
             ),
 
-            React.createElement("div", { className: "mt-3 space-y-2 text-gray-300 flex-grow" },
+            React.createElement("div", { className: `mt-3 space-y-2 ${assignment.serviceEnded ? 'text-gray-500' : 'text-gray-300'} flex-grow` },
                  assignment.implementationTime && (
                     React.createElement("div", { className: "flex items-center" },
                         React.createElement(ClockIcon, { className: "w-5 h-5 mr-2 text-teal-400 flex-shrink-0" }),
-                        React.createElement("span", { className: "font-semibold text-teal-300" }, assignment.implementationTime)
+                        React.createElement("span", { className: `font-semibold ${assignment.serviceEnded ? 'text-teal-600' : 'text-teal-300'} ${textStrikeThroughClass}` }, assignment.implementationTime)
                     )
                 ),
                 React.createElement("div", { className: "flex items-center" },
                     React.createElement(ClockIcon, { className: "w-5 h-5 mr-2 text-gray-400 flex-shrink-0" }),
-                    React.createElement("span", null, assignment.time)
+                    React.createElement("span", { className: textStrikeThroughClass }, assignment.time)
                 ),
                 React.createElement("div", { className: "flex items-start" },
                     React.createElement(UsersIcon, { className: `w-5 h-5 mr-2 flex-shrink-0 mt-1 ${personnelStyle.icon}` }),
@@ -52,15 +60,15 @@ const AssignmentCard = ({ assignment, onStatusChange }) => {
                 ),
                 assignment.unit && (
                     React.createElement("div", { className: "flex items-center" },
-                    React.createElement(LocationMarkerIcon, { className: "w-5 h-5 mr-2 text-gray-400 flex-shrink-0" }),
-                    React.createElement("span", null, "Unidad: ", assignment.unit)
+                        React.createElement(LocationMarkerIcon, { className: "w-5 h-5 mr-2 text-gray-400 flex-shrink-0" }),
+                        React.createElement("span", { className: textStrikeThroughClass }, "Unidad: ", assignment.unit)
                     )
                 )
             ),
             otherDetails.length > 0 && (
-                React.createElement("div", { className: "text-sm text-gray-400 italic pt-3 mt-3 border-t border-gray-700 space-y-1" },
+                React.createElement("div", { className: `text-sm italic pt-3 mt-3 border-t border-gray-700 space-y-1 ${assignment.serviceEnded ? 'text-gray-500' : 'text-gray-400'}` },
                     otherDetails.map((detail, index) => (
-                        React.createElement("p", { key: index }, detail.trim())
+                        React.createElement("p", { key: index, className: textStrikeThroughClass }, detail.trim())
                     ))
                 )
             ),
