@@ -1,14 +1,19 @@
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons.tsx';
 import { exportExcelTemplate, exportWordTemplate } from '../services/exportService.ts';
+// FIX: Import Personnel type to use in props
+import { Personnel } from '../types.ts';
 
+// FIX: Update props to include personnel lists
 interface HelpModalProps {
     isOpen: boolean;
     onClose: () => void;
     unitList: string[];
+    commandPersonnel: Personnel[];
+    servicePersonnel: Personnel[];
 }
 
-const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList }) => {
+const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonnel }) => {
   if (!isOpen) {
     return null;
   }
@@ -86,7 +91,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList }) => {
               ><DownloadIcon className="w-5 h-5"/>Descargar Plantilla Excel</button>
               <button
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white font-medium rounded-md transition-colors"
-                onClick={() => exportWordTemplate(unitList)}
+                // FIX: Pass all required lists to exportWordTemplate to fix argument mismatch and align with functionality.
+                onClick={() => exportWordTemplate({ unitList, commandPersonnel, servicePersonnel })}
                 aria-label="Descargar plantilla de Word de ejemplo"
               ><DownloadIcon className="w-5 h-5"/>Descargar Plantilla Word</button>
             </div>

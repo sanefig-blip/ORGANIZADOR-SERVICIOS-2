@@ -1,8 +1,12 @@
 
 
+
+
+
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
-import { Schedule, Assignment, Service } from '../types';
+// FIX: Import Personnel type
+import { Schedule, Assignment, Service, Personnel } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -104,7 +108,13 @@ export const exportScheduleToWord = (schedule: Schedule) => {
             const assignmentsContent = service.assignments.flatMap(assignment => createAssignmentParagraphs(assignment, false));
 
             const serviceParagraphs = [
-                new Paragraph({ text: `SERVICE_TITLE_MARKER::${service.title}`, style: "Heading2" }),
+                new Paragraph({
+                    style: "Heading2",
+                    children: [
+                        new TextRun({ text: "SERVICE_TITLE_MARKER::", size: 2, color: "FFFFFF" }),
+                        new TextRun(service.title)
+                    ],
+                }),
                 ...(service.description ? [new Paragraph({
                     children: [new TextRun({ text: service.description, ...ITALIC_CONTENT_STYLE })],
                     spacing: { after: 100 }
@@ -210,8 +220,8 @@ export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: TimeExpo
 };
 
 export const exportExcelTemplate = () => {
-    const headers = ["Título del Servicio", "Descripción del Servicio", "Novedad del Servicio", "Ubicación de Asignación", "Horario de Asignación", "Personal de Asignación", "Unidad de Asignación", "Detalles de Asignación"];
-    const exampleRow = ["EVENTOS DEPORTIVOS", "O.S. 1234/25", "Presentarse con uniforme de gala.", "Estadio Monumental", "18:00 Hs. a terminar.-", "Personal a designar", "FZ-1234", "Encuentro Futbolístico 'EQUIPO A VS. EQUIPO B';HORARIO DE IMPLANTACION: 16:00 Hs."];
+    const headers = ["Título del Servicio", "Descripción del Servicio", "Novedad del Servicio", "Ubicación de Asignación", "Horario de Asignación", "Horario de Implantación", "Personal de Asignación", "Unidad de Asignación", "Detalles de Asignación"];
+    const exampleRow = ["EVENTOS DEPORTIVOS", "O.S. 1234/25", "Presentarse con uniforme de gala.", "Estadio Monumental", "18:00 Hs. a terminar.-", "16:00 Hs.", "Personal a designar", "FZ-1234", "Encuentro Futbolístico 'EQUIPO A VS. EQUIPO B'"];
     const worksheet = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla de Servicios');
@@ -226,10 +236,8 @@ export const exportScheduleAsExcelTemplate = (schedule: Schedule) => {
       services.forEach(service => {
         if (service.assignments.length === 0) data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '' });
         else service.assignments.forEach(assignment => {
-            const allDetails = [];
-            if (assignment.implementationTime) allDetails.push(assignment.implementationTime);
-            if (assignment.details) allDetails.push(...assignment.details);
-            data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '', "Ubicación de Asignación": assignment.location, "Horario de Asignación": assignment.time, "Personal de Asignación": assignment.personnel, "Unidad de Asignación": assignment.unit || '', "Detalles de Asignación": allDetails.join('; ') });
+            const allDetails = assignment.details ? [...assignment.details] : [];
+            data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '', "Ubicación de Asignación": assignment.location, "Horario de Asignación": assignment.time, "Horario de Implantación": assignment.implementationTime || '', "Personal de Asignación": assignment.personnel, "Unidad de Asignación": assignment.unit || '', "Detalles de Asignación": allDetails.join('; ') });
         });
       });
       return data;
@@ -261,12 +269,11 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
                 if (assignment) {
                     paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Ubicación de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.location, ...CONTENT_STYLE })] }));
                     paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.time, ...CONTENT_STYLE })] }));
+                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Implantación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.implementationTime || '', ...CONTENT_STYLE })] }));
                     paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Personal de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.personnel, ...CONTENT_STYLE })] }));
                     if (assignment.unit) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Unidad de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.unit, ...CONTENT_STYLE })] }));
                     
-                    const allDetails = [];
-                    if (assignment.implementationTime) allDetails.push(assignment.implementationTime);
-                    if (assignment.details) allDetails.push(...assignment.details);
+                    const allDetails = assignment.details || [];
                     if (allDetails.length > 0) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Detalles de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: allDetails.join('; '), ...CONTENT_STYLE })] }));
                 }
                 
@@ -300,46 +307,101 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
 };
 
 
-export const exportWordTemplate = (unitList: string[]) => {
-  const createField = (label: string, placeholder: string) => new Paragraph({
-    children: [new TextRun({ text: `${label}: `, ...LABEL_STYLE }), new TextRun({ text: placeholder, ...ITALIC_PLACEHOLDER_STYLE })],
-    spacing: { after: 100 }
-  });
+// FIX: Update function to accept lists and include them in the document.
+export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }: {
+    unitList: string[];
+    commandPersonnel: Personnel[];
+    servicePersonnel: Personnel[];
+}) => {
+    const instructions = new Paragraph({
+        children: [
+            new TextRun({
+                text: 'Instrucciones: Rellene la siguiente tabla para cada servicio. Puede copiar y pegar la tabla completa para añadir servicios adicionales. Los campos con (*) son obligatorios.',
+                ...ITALIC_CONTENT_STYLE,
+                size: 20,
+            }),
+        ],
+        spacing: { after: 200 },
+    });
 
-  const exampleContent = [
-    createField('Título del Servicio', '[Escribe aquí el título]'),
-    createField('Descripción del Servicio', '[Escribe aquí la descripción]'),
-    new Paragraph({ children: [new TextRun({ text: "Novedad del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: '[Escribe aquí la novedad]', ...ITALIC_PLACEHOLDER_STYLE })], spacing: { after: 300 } }),
+    const createRow = (label: string, placeholder: string) => new TableRow({
+        children: [
+            new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: label, ...LABEL_STYLE })] })],
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                shading: { type: ShadingType.CLEAR, fill: "EAEAEA" },
+            }),
+            new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text: placeholder, ...ITALIC_PLACEHOLDER_STYLE })] })],
+                width: { size: 70, type: WidthType.PERCENTAGE },
+            }),
+        ],
+    });
 
-    createField('Ubicación de Asignación', '[Escribe aquí la ubicación]'),
-    createField('Horario de Asignación', '[Escribe aquí el horario]'),
-    createField('Personal de Asignación', '[Escribe aquí el personal]'),
-    createField('Unidad de Asignación', '[Escribe aquí la unidad si aplica]'),
-    createField('Detalles de Asignación', '[Escribe aquí un detalle]'),
-    createField('Detalles de Asignación', '[Puedes añadir más detalles en líneas separadas]'),
-    new Paragraph({ children: [new TextRun({ text: '--- (Separa servicios distintos con una nueva línea "Título del Servicio") ---', ...ITALIC_CONTENT_STYLE, color: '888888' })], spacing: { before: 200, after: 200 } })
-  ];
+    const serviceTable = new Table({
+        rows: [
+            createRow('Título del Servicio (*)', '[Ej: COBERTURA DE EVENTO]'),
+            createRow('Descripción del Servicio', '[Ej: O.S. 1234/25]'),
+            createRow('Novedad del Servicio', '[Ej: Concurrir con uniforme de gala]'),
+            createRow('Ubicación de Asignación (*)', '[Ej: Estadio Monumental]'),
+            createRow('Horario de Asignación (*)', '[Ej: 18:00 Hs. a terminar.-]'),
+            createRow('Horario de Implantación', '[Ej: 16:00 Hs.]'),
+            createRow('Personal de Asignación (*)', '[Ej: Personal a designar]'),
+            createRow('Unidad de Asignación', '[Ej: FZ-1234]'),
+            createRow('Detalles de Asignación', '[Ej: Encuentro Futbolístico "EQUIPO A VS. EQUIPO B"]'),
+        ],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+    });
 
-  const doc = new Document({
-    creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
-    title: "Plantilla para Importación de Servicios",
-    styles: { paragraphStyles: [
-        { id: "Heading1", name: "Heading 1", run: { size: 32, bold: true, font: "Arial" }, paragraph: { spacing: { before: 240, after: 240 } } },
-        { id: "Heading2", name: "Heading 2", run: { size: 28, bold: true, font: "Arial" }, paragraph: { spacing: { before: 300, after: 150 } } },
-    ]},
-    sections: [{ children: [
-        new Paragraph({ text: "Plantilla de Importación de Servicios", style: "Heading1" }),
-        new Paragraph({ children: [new TextRun({ text: "Rellena los campos para cada asignación. Para crear un nuevo servicio, simplemente empieza otra vez con 'Título del Servicio:'.", ...ITALIC_CONTENT_STYLE })], spacing: { after: 300 } }),
-        ...exampleContent,
-        new Paragraph({ text: "Listados de Ayuda", style: "Heading1", spacing: { before: 400 } }),
-        new Paragraph({ children: [new TextRun({ text: "Copia y pega los nombres/unidades desde estas listas para asegurar la precisión.", ...ITALIC_CONTENT_STYLE })], spacing: { after: 200 } }),
+    const allPersonnel = [...commandPersonnel, ...servicePersonnel]
+        .filter((p, index, self) => index === self.findIndex((t) => t.id === p.id)) // unique
+        .sort((a,b) => a.name.localeCompare(b.name));
+
+    const unitParagraphs = [
         new Paragraph({ text: "Unidades Disponibles", style: "Heading2" }),
-        ...unitList.map(u => new Paragraph({ text: u, bullet: { level: 0 }})),
-    ]}]
-  });
+        ...unitList.map(unit => new Paragraph({ text: unit, bullet: { level: 0 } }))
+    ];
 
-  Packer.toBlob(doc).then(blob => saveFile(blob, 'plantilla_servicios_completa.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    const personnelParagraphs = [
+        new Paragraph({ text: "Personal Disponible", style: "Heading2" }),
+        ...allPersonnel.map(p => new Paragraph({ text: `${p.rank} - ${p.name} (L.P. ${p.id})`, bullet: { level: 0 } }))
+    ];
+
+    const doc = new Document({
+        creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
+        title: "Plantilla para Importación de Servicios",
+        styles: {
+            paragraphStyles: [
+                {
+                    id: "Heading1",
+                    name: "Heading 1",
+                    run: { size: 32, bold: true, font: "Arial" },
+                    paragraph: { spacing: { before: 240, after: 240 }, alignment: AlignmentType.CENTER }
+                },
+                { 
+                    id: "Heading2", 
+                    name: "Heading 2", 
+                    run: HEADING_2_RUN_STYLE, 
+                    paragraph: { spacing: { before: 240, after: 120 } } 
+                },
+            ]
+        },
+        sections: [{
+            children: [
+                new Paragraph({ text: "Plantilla de Importación de Servicios", style: "Heading1" }),
+                instructions,
+                serviceTable,
+                new Paragraph({ children: [new PageBreak()] }),
+                ...unitParagraphs,
+                new Paragraph({ text: "" }),
+                ...personnelParagraphs,
+            ]
+        }]
+    });
+
+    Packer.toBlob(doc).then(blob => saveFile(blob, 'plantilla_servicios_tabla.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
+
 
 export const exportRosterTemplate = () => {
     const template = {

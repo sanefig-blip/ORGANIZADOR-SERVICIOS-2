@@ -2,7 +2,8 @@ import React from 'react';
 import { XIcon, DownloadIcon } from './icons.js';
 import { exportExcelTemplate, exportWordTemplate } from '../services/exportService.js';
 
-const HelpModal = ({ isOpen, onClose, unitList }) => {
+// FIX: Update component signature to accept personnel lists
+const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonnel }) => {
   if (!isOpen) {
     return null;
   }
@@ -80,7 +81,8 @@ const HelpModal = ({ isOpen, onClose, unitList }) => {
               }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), "Descargar Plantilla Excel"),
               React.createElement("button", {
                 className: "inline-flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white font-medium rounded-md transition-colors",
-                onClick: () => exportWordTemplate(unitList),
+                // FIX: Pass all required lists to exportWordTemplate
+                onClick: () => exportWordTemplate({ unitList, commandPersonnel, servicePersonnel }),
                 "aria-label": "Descargar plantilla de Word de ejemplo"
               }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), "Descargar Plantilla Word")
             )

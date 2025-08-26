@@ -684,8 +684,8 @@ const App: React.FC = () => {
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
                 {renderContent()}
             </main>
-
-            {isHelpModalOpen && <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} unitList={unitList} />}
+            {/* FIX: Pass personnel lists to HelpModal */}
+            {isHelpModalOpen && <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} unitList={unitList} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} />}
             {isRosterModalOpen && <RosterImportModal isOpen={isRosterModalOpen} onClose={() => setIsRosterModalOpen(false)} onConfirm={() => rosterInputRef.current?.click()} />}
             {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps)} onDeleteTemplate={handleDeleteTemplate} />}
             {isExportTemplateModalOpen && <ExportTemplateModal isOpen={isExportTemplateModalOpen} onClose={() => setIsExportTemplateModalOpen(false)} onExport={handleExportAsTemplate} />}
