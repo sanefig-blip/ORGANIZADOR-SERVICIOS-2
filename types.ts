@@ -150,6 +150,26 @@ export interface EraData {
   stations: EraReportStation[];
 }
 
+// New types for Generator Report
+export interface GeneratorEquipment {
+  id: string;
+  brand: string;
+  kva: string;
+  condition: string;
+  dependency: string;
+}
+
+export interface GeneratorReportStation {
+  name: string;
+  hasEquipment: boolean;
+  equipment: GeneratorEquipment[];
+}
+
+export interface GeneratorData {
+  reportDate: string;
+  stations: GeneratorReportStation[];
+}
+
 
 // SCI Forms Types
 export interface SCI201Action {

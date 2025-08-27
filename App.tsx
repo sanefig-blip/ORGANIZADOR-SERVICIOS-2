@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData } from './types.ts';
+import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
 import { unitReportData as preloadedUnitReportData } from './data/unitReportData.ts';
 import { eraData as preloadedEraData } from './data/eraData.ts';
+import { generatorData as preloadedGeneratorData } from './data/generatorData.ts';
 import { rosterData as preloadedRosterData } from './data/rosterData.ts';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.ts';
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.ts';
@@ -17,6 +18,7 @@ import UnitReportDisplay from './components/UnitReportDisplay.tsx';
 import UnitStatusView from './components/UnitStatusView.tsx';
 import CommandPostView from './components/CommandPostView.tsx';
 import EraReportDisplay from './components/EraReportDisplay.tsx';
+import GeneratorReportDisplay from './components/GeneratorReportDisplay.tsx';
 import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
@@ -42,6 +44,7 @@ const App: React.FC = () => {
     const [schedule, setSchedule] = useState<Schedule | null>(null);
     const [unitReport, setUnitReport] = useState<UnitReportData | null>(null);
     const [eraReport, setEraReport] = useState<EraData | null>(null);
+    const [generatorReport, setGeneratorReport] = useState<GeneratorData | null>(null);
     const [view, setView] = useState('unit-report'); // Default to new view
     const [displayDate, setDisplayDate] = useState<Date | null>(null);
     const [commandPersonnel, setCommandPersonnel] = useState<Personnel[]>([]);
@@ -173,10 +176,20 @@ const App: React.FC = () => {
             console.error("Failed to load or parse ERA report data, falling back to default.", e);
             eraReportToLoad = preloadedEraData;
         }
+        
+        let generatorReportToLoad;
+        try {
+            const savedGeneratorReportJSON = localStorage.getItem('generatorReportData');
+            generatorReportToLoad = savedGeneratorReportJSON ? JSON.parse(savedGeneratorReportJSON) : preloadedGeneratorData;
+        } catch(e) {
+            console.error("Failed to load or parse Generator report data, falling back to default.", e);
+            generatorReportToLoad = preloadedGeneratorData;
+        }
           
         setSchedule(dataCopy);
         setUnitReport(unitReportToLoad);
         setEraReport(eraReportToLoad);
+        setGeneratorReport(generatorReportToLoad);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
 
@@ -232,6 +245,11 @@ const App: React.FC = () => {
     const handleUpdateEraReport = (updatedData: EraData) => {
         localStorage.setItem('eraReportData', JSON.stringify(updatedData));
         setEraReport(updatedData);
+    };
+
+    const handleUpdateGeneratorReport = (updatedData: GeneratorData) => {
+        localStorage.setItem('generatorReportData', JSON.stringify(updatedData));
+        setGeneratorReport(updatedData);
     };
 
     const handleUpdateService = (updatedService: Service, type: 'common' | 'sports') => {
@@ -662,6 +680,14 @@ const App: React.FC = () => {
                         onUpdateReport={handleUpdateEraReport}
                     />
                 );
+            case 'generator-report':
+                if (!generatorReport) return null;
+                return (
+                    <GeneratorReportDisplay
+                        reportData={generatorReport}
+                        onUpdateReport={handleUpdateGeneratorReport}
+                    />
+                );
             case 'schedule':
                 if (!filteredSchedule) return null;
                 return (
@@ -696,7 +722,7 @@ const App: React.FC = () => {
     
     const getButtonClass = (buttonView: string) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`;
     
-    if (!schedule || !displayDate || !unitReport || !eraReport) {
+    if (!schedule || !displayDate || !unitReport || !eraReport || !generatorReport) {
         return (
             <div className="bg-zinc-900 text-white min-h-screen flex justify-center items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" />
@@ -725,6 +751,7 @@ const App: React.FC = () => {
                             <button className={getButtonClass('unit-status')} onClick={() => setView('unit-status')}><FilterIcon className="w-5 h-5" /> Estado de Unidades</button>
                             <button className={getButtonClass('command-post')} onClick={() => setView('command-post')}><AnnotationIcon className="w-5 h-5" /> Puesto Comando</button>
                             <button className={getButtonClass('era-report')} onClick={() => setView('era-report')}><LightningBoltIcon className="w-5 h-5" /> Trasvazadores E.R.A.</button>
+                            <button className={getButtonClass('generator-report')} onClick={() => setView('generator-report')}><LightningBoltIcon className="w-5 h-5" /> Grupos Electrógenos</button>
                             <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Planificador</button>
                             <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className="w-5 h-5" /> Vista por Hora</button>
                             <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className="w-5 h-5" /> Nomencladores</button>

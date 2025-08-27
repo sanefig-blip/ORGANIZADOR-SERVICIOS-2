@@ -3,6 +3,7 @@ import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
 import { unitReportData as preloadedUnitReportData } from './data/unitReportData.js';
 import { eraData as preloadedEraData } from './data/eraData.js';
+import { generatorData as preloadedGeneratorData } from './data/generatorData.js';
 import { rosterData as preloadedRosterData } from './data/rosterData.js';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.js';
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.js';
@@ -17,6 +18,7 @@ import UnitReportDisplay from './components/UnitReportDisplay.js';
 import UnitStatusView from './components/UnitStatusView.js';
 import CommandPostView from './components/CommandPostView.js';
 import EraReportDisplay from './components/EraReportDisplay.js';
+import GeneratorReportDisplay from './components/GeneratorReportDisplay.js';
 import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.js';
 import HelpModal from './components/HelpModal.js';
 import RosterImportModal from './components/RosterImportModal.js';
@@ -42,6 +44,7 @@ const App = () => {
     const [schedule, setSchedule] = useState(null);
     const [unitReport, setUnitReport] = useState(null);
     const [eraReport, setEraReport] = useState(null);
+    const [generatorReport, setGeneratorReport] = useState(null);
     const [view, setView] = useState('unit-report'); // Default to new view
     const [displayDate, setDisplayDate] = useState(null);
     const [commandPersonnel, setCommandPersonnel] = useState([]);
@@ -172,10 +175,20 @@ const App = () => {
             console.error("Failed to load or parse ERA report data, falling back to default.", e);
             eraReportToLoad = preloadedEraData;
         }
+        
+        let generatorReportToLoad;
+        try {
+            const savedGeneratorReportJSON = localStorage.getItem('generatorReportData');
+            generatorReportToLoad = savedGeneratorReportJSON ? JSON.parse(savedGeneratorReportJSON) : preloadedGeneratorData;
+        } catch(e) {
+            console.error("Failed to load or parse Generator report data, falling back to default.", e);
+            generatorReportToLoad = preloadedGeneratorData;
+        }
           
         setSchedule(dataCopy);
         setUnitReport(unitReportToLoad);
         setEraReport(eraReportToLoad);
+        setGeneratorReport(generatorReportToLoad);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
 
@@ -231,6 +244,11 @@ const App = () => {
     const handleUpdateEraReport = (updatedData) => {
         localStorage.setItem('eraReportData', JSON.stringify(updatedData));
         setEraReport(updatedData);
+    };
+
+    const handleUpdateGeneratorReport = (updatedData) => {
+        localStorage.setItem('generatorReportData', JSON.stringify(updatedData));
+        setGeneratorReport(updatedData);
     };
 
     const handleUpdateService = (updatedService, type) => {
@@ -657,6 +675,12 @@ const App = () => {
                         reportData: eraReport,
                         onUpdateReport: handleUpdateEraReport
                     });
+            case 'generator-report':
+                if (!generatorReport) return null;
+                return React.createElement(GeneratorReportDisplay, {
+                    reportData: generatorReport,
+                    onUpdateReport: handleUpdateGeneratorReport
+                });
             case 'schedule':
                 if (!filteredSchedule) return null;
                 return React.createElement(ScheduleDisplay, {
@@ -685,7 +709,7 @@ const App = () => {
     
     const getButtonClass = (buttonView) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`;
     
-    if (!schedule || !displayDate || !unitReport || !eraReport) {
+    if (!schedule || !displayDate || !unitReport || !eraReport || !generatorReport) {
         return (
             React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen flex justify-center items-center" },
                 React.createElement("div", { className: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" })
@@ -714,6 +738,7 @@ const App = () => {
                             React.createElement("button", { className: getButtonClass('unit-status'), onClick: () => setView('unit-status') }, React.createElement(FilterIcon, { className: "w-5 h-5" }), " Estado de Unidades"),
                             React.createElement("button", { className: getButtonClass('command-post'), onClick: () => setView('command-post') }, React.createElement(AnnotationIcon, { className: "w-5 h-5" }), " Puesto Comando"),
                             React.createElement("button", { className: getButtonClass('era-report'), onClick: () => setView('era-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Trasvazadores E.R.A."),
+                            React.createElement("button", { className: getButtonClass('generator-report'), onClick: () => setView('generator-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Grupos Electrógenos"),
                             React.createElement("button", { className: getButtonClass('schedule'), onClick: () => setView('schedule') }, React.createElement(ClipboardListIcon, { className: "w-5 h-5" }), " Planificador"),
                             React.createElement("button", { className: getButtonClass('time-grouped'), onClick: () => setView('time-grouped') }, React.createElement(ClockIcon, { className: "w-5 h-5" }), " Vista por Hora"),
                             React.createElement("button", { className: getButtonClass('nomenclador'), onClick: () => setView('nomenclador') }, React.createElement(BookOpenIcon, { className: "w-5 h-5" }), " Nomencladores"),

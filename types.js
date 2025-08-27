@@ -50,3 +50,8 @@ export const SCI207Victim = {};
 export const EraEquipment = {};
 export const EraReportStation = {};
 export const EraData = {};
+
+// Generator Report Types
+export const GeneratorEquipment = {};
+export const GeneratorReportStation = {};
+export const GeneratorData = {};
