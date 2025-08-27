@@ -121,18 +121,18 @@ const parseFullSchedule = (lines) => {
     let isParsingSportsEvents = false;
 
     const dateLine = lines.find(l => l.toUpperCase().startsWith('GUARDIA DEL DIA'));
-    if (!dateLine) return null;
-
-    const dateMatch = dateLine.match(/GUARDIA DEL DIA\s?(\d+)\s?(?:DE)?\s?(\w+)\s*DE\s*(\d+)/i);
-    if (dateMatch) {
-        const day = dateMatch[1];
-        const monthStr = dateMatch[2].toUpperCase();
-        const year = dateMatch[3];
-        schedule.date = `${day} DE ${monthStr} DE ${year}`;
+    if (dateLine) {
+        const dateMatch = dateLine.match(/(\d+)\sDE\s(\w+)\sDE\s(\d{4})/i);
+        if (dateMatch) {
+            const day = dateMatch[1];
+            const monthStr = dateMatch[2].toUpperCase();
+            const year = dateMatch[3];
+            schedule.date = `${day} DE ${monthStr} DE ${year}`;
+        }
     }
 
     const commitAssignment = () => {
-        if (currentService && (currentAssignment.location || currentAssignment.details?.length)) {
+        if (currentService && (currentAssignment.location || (currentAssignment.details && currentAssignment.details.length > 0))) {
              currentService.assignments.push({
                 id: `imported-${Date.now()}-${Math.random()}`,
                 location: currentAssignment.location || 'Ubicación a detallar',
@@ -146,8 +146,9 @@ const parseFullSchedule = (lines) => {
     };
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
+        const line = lines[i].trim();
+        if (!line) continue;
+        
         const staffMatch = line.match(/(JEFE DE (?:INSPECCIONES|SERVICIO|GUARDIA|RESERVA))\s*:\s*([^(\n]+)/i);
         if (staffMatch) {
             const role = staffMatch[1].toUpperCase().trim();
@@ -164,7 +165,8 @@ const parseFullSchedule = (lines) => {
             });
             continue;
         }
-        
+
+        if (line.toUpperCase().trim() === 'SERVICIOS') continue;
         if (line.toUpperCase().trim() === 'EVENTOS DEPORTIVOS') {
             commitAssignment();
             currentService = null;
@@ -172,24 +174,19 @@ const parseFullSchedule = (lines) => {
             continue;
         }
 
-        const markedTitleMatch = line.match(/^SERVICE_TITLE_MARKER::(.*)/i);
-        const serviceMatch = !markedTitleMatch && line.match(/^(\d+)\s*-\s*O\.S\s*[\d/]+\s*[–-]?\s*“?([^”]+)”?\s*(\(.*\))?/i);
-        const altServiceMatch = !markedTitleMatch && !serviceMatch && line.match(/^\d+\s*-\s*SERVICIO PREVENCIONAL\s*-\s*"(.*)"/i);
-
-        if (markedTitleMatch || serviceMatch || altServiceMatch) {
+        const newServiceMatch = line.match(/^(\d+)\s*[-–]\s*(.*)/);
+        if (newServiceMatch) {
             commitAssignment();
             currentService = null;
             
-            let title = '';
+            let fullTitle = newServiceMatch[2].trim().replace(/[.-]$/, '').replace(/^["“]|["”]$/g, '').trim();
+            const osMatch = fullTitle.match(/^(O\.S\.\s*[\d/]+)\s*[-–]?\s*(.*)/i);
+            let title = fullTitle;
             let description = '';
 
-            if (markedTitleMatch) {
-                title = markedTitleMatch[1].trim();
-            } else if (serviceMatch) {
-                title = `${serviceMatch[2].trim()} ${serviceMatch[3] ? serviceMatch[3].trim() : ''}`.trim();
-                description = line.match(/O\.S\s*[\d/]+/i)?.[0] || '';
-            } else if (altServiceMatch) {
-                title = altServiceMatch[1].trim();
+            if (osMatch) {
+                description = osMatch[1].trim();
+                title = osMatch[2].trim().replace(/^["“]|["”]$/g, '').trim();
             }
 
             const service = {
@@ -206,39 +203,42 @@ const parseFullSchedule = (lines) => {
 
         if (!currentService) continue;
 
-        const fieldMatch = line.match(/^(QTH|HORARIO DE IMPLANTACIÓN|HORARIO|UNIDAD|PERSONAL|MODALIDAD DE COBERTURA|DESTACAMENTO)\s*:\s*(.*)/i);
+        const fieldMatch = line.match(/^(QTH|HORARIO DE IMPLANTACIÓN|HORARIO|UNIDAD|PERSONAL|MODALIDAD DE COBERTURA)\s*:\s*(.*)/i);
         if (fieldMatch) {
             const key = fieldMatch[1].toUpperCase().trim();
-            const value = fieldMatch[2].trim().replace(/\.-$/, '').trim();
+            const value = fieldMatch[2].trim().replace(/[.-]$/, '').trim();
+            
+            if (currentAssignment.location && key === 'QTH') {
+                 commitAssignment();
+            }
 
             switch (key) {
-                case 'QTH':
-                    commitAssignment();
-                    currentAssignment.location = value;
-                    break;
+                case 'QTH': currentAssignment.location = value; break;
                 case 'HORARIO DE IMPLANTACIÓN': currentAssignment.implementationTime = `HORARIO DE IMPLANTACION: ${value}`; break;
                 case 'HORARIO': currentAssignment.time = value; break;
                 case 'UNIDAD': currentAssignment.unit = value; break;
                 case 'PERSONAL': currentAssignment.personnel = value; break;
-                case 'DESTACAMENTO':
-                     if (!currentAssignment.location) currentAssignment.location = `DESTACAMENTO: ${value}`;
-                     else currentAssignment.location += ` - DESTACAMENTO: ${value}`;
-                     break;
-                case 'MODALIDAD DE COBERTURA': currentService.novelty = (currentService.novelty || '') + value + ' '; break;
+                case 'MODALIDAD DE COBERTURA': 
+                    if (currentAssignment.location) commitAssignment();
+                    currentService.novelty = (currentService.novelty || '') + value + ' '; 
+                    break;
             }
             continue;
         }
-        
-        const isLocationLine = /^[A-ZÁÉÍÓÚÑ\s\d-()\/"]+$/.test(line) && !line.startsWith('OFICIAL') && !line.startsWith('BRO') && !line.startsWith('SUBTTE') && !line.startsWith('INSPECTOR') && !line.startsWith('JEFE') && !line.startsWith('TENIENTE');
-        if (isLocationLine && line.length > 8 && currentService && !line.startsWith("COBERTURA ASIGNADA")) {
+
+        const nextLine = (lines[i + 1] || '').trim().toUpperCase();
+        if (line === line.toUpperCase() && line.length > 8 && !line.match(/^(\d+)\s*[-–]/) && nextLine.startsWith('HORARIO:')) {
             commitAssignment();
-            currentAssignment.location = line;
+            currentAssignment.location = line.replace(/[.-]$/, '').trim();
             continue;
         }
 
         if (line.length > 0) {
-             if (line.match(/^(La misma|MISION|Personal deberá)/i)) {
-                currentService.novelty = (currentService.novelty || '') + line + ' ';
+             if (line.match(/^(La misma|MISION|Personal deberá|Por orden superior)/i)) {
+                 if (currentAssignment.location || (currentAssignment.details && currentAssignment.details.length > 0)) {
+                    commitAssignment();
+                 }
+                currentService.novelty = ((currentService.novelty || '') + ' ' + line).trim();
              } else {
                 if (!currentAssignment.details) currentAssignment.details = [];
                 currentAssignment.details.push(line);
@@ -246,8 +246,6 @@ const parseFullSchedule = (lines) => {
         }
     }
     commitAssignment();
-    
-    schedule.sportsEvents = schedule.sportsEvents?.filter(s => s.assignments.length > 0 || !s.title.includes("EVENTOS DEPORTIVOS"));
     
     return (schedule.services.length > 0 || schedule.sportsEvents.length > 0 || schedule.commandStaff.length > 0) ? schedule : null;
 };
