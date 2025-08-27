@@ -1,12 +1,8 @@
-
-
-
-
-
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
-// FIX: Import Personnel type
-import { Schedule, Assignment, Service, Personnel } from '../types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -195,11 +191,12 @@ export const exportScheduleToWord = (schedule: Schedule) => {
     Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
-interface TimeExportData { date: string; assignmentsByTime: { [time: string]: Assignment[] }; }
-
-export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: TimeExportData) => {
+export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: { date: string; assignmentsByTime: { [time: string]: Assignment[] }; }) => {
     const sortedTimeKeys = Object.keys(assignmentsByTime).sort((a, b) => parseInt(a.split(':')[0], 10) - parseInt(b.split(':')[0], 10));
-    const content = sortedTimeKeys.flatMap(time => [ new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }), ...assignmentsByTime[time].flatMap(assignment => createAssignmentParagraphs(assignment, true))]);
+    const content = sortedTimeKeys.flatMap(time => [
+        new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }),
+        ...assignmentsByTime[time].flatMap(assignment => createAssignmentParagraphs(assignment, true))
+    ]);
 
     const doc = new Document({
         creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
@@ -219,6 +216,7 @@ export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: TimeExpo
     Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_por_Hora_${date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
+
 export const exportExcelTemplate = () => {
     const headers = ["Título del Servicio", "Descripción del Servicio", "Novedad del Servicio", "Ubicación de Asignación", "Horario de Asignación", "Horario de Implantación", "Personal de Asignación", "Unidad de Asignación", "Detalles de Asignación"];
     const exampleRow = ["EVENTOS DEPORTIVOS", "O.S. 1234/25", "Presentarse con uniforme de gala.", "Estadio Monumental", "18:00 Hs. a terminar.-", "16:00 Hs.", "Personal a designar", "FZ-1234", "Encuentro Futbolístico 'EQUIPO A VS. EQUIPO B'"];
@@ -229,16 +227,34 @@ export const exportExcelTemplate = () => {
     saveFile(excelBuffer, 'plantilla_servicios.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };
 
+
 export const exportScheduleAsExcelTemplate = (schedule: Schedule) => {
     const createSheetData = (services: Service[]) => {
       if (!services || services.length === 0) return [];
       const data: any[] = [];
       services.forEach(service => {
-        if (service.assignments.length === 0) data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '' });
-        else service.assignments.forEach(assignment => {
-            const allDetails = assignment.details ? [...assignment.details] : [];
-            data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '', "Ubicación de Asignación": assignment.location, "Horario de Asignación": assignment.time, "Horario de Implantación": assignment.implementationTime || '', "Personal de Asignación": assignment.personnel, "Unidad de Asignación": assignment.unit || '', "Detalles de Asignación": allDetails.join('; ') });
-        });
+        if (service.assignments.length === 0) {
+            data.push({
+                "Título del Servicio": service.title,
+                "Descripción del Servicio": service.description || '',
+                "Novedad del Servicio": service.novelty || ''
+            });
+        } else {
+            service.assignments.forEach(assignment => {
+                const allDetails = assignment.details ? [...assignment.details] : [];
+                data.push({
+                    "Título del Servicio": service.title,
+                    "Descripción del Servicio": service.description || '',
+                    "Novedad del Servicio": service.novelty || '',
+                    "Ubicación de Asignación": assignment.location,
+                    "Horario de Asignación": assignment.time,
+                    "Horario de Implantación": assignment.implementationTime || '',
+                    "Personal de Asignación": assignment.personnel,
+                    "Unidad de Asignación": assignment.unit || '',
+                    "Detalles de Asignación": allDetails.join('; ')
+                });
+            });
+        }
       });
       return data;
     };
@@ -247,19 +263,23 @@ export const exportScheduleAsExcelTemplate = (schedule: Schedule) => {
     const sportsEventsData = createSheetData(schedule.sportsEvents);
     
     const workbook = XLSX.utils.book_new();
-    if (commonServicesData.length > 0) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(commonServicesData), 'Servicios Comunes');
-    if (sportsEventsData.length > 0) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sportsEventsData), 'Eventos Deportivos');
+    if (commonServicesData.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(commonServicesData), 'Servicios Comunes');
+    }
+    if (sportsEventsData.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sportsEventsData), 'Eventos Deportivos');
+    }
     
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     saveFile(excelBuffer, `plantilla_desde_horario_${schedule.date.replace(/\s/g, '_')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };
 
 export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
-    const createTemplateSection = (services: Service[], title: string): Paragraph[] => {
+    const createTemplateSection = (services: Service[], title: string) => {
         if (!services || services.length === 0) return [];
         
         const sectionContent = services.flatMap(service => {
-            const processAssignment = (assignment?: Assignment): Paragraph[] => {
+            const processAssignment = (assignment?: Assignment) => {
                 const paragraphs = [
                     new Paragraph({ children: [new TextRun({ text: "Título del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.title, ...CONTENT_STYLE })] }),
                     new Paragraph({ children: [new TextRun({ text: "Descripción del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.description || '', ...CONTENT_STYLE })] }),
@@ -284,7 +304,9 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
             return service.assignments.length === 0 ? processAssignment() : service.assignments.flatMap(processAssignment);
         });
 
-        if (sectionContent.length > 0) sectionContent[sectionContent.length - 1] = new Paragraph({ text: "" }); // Remove last separator
+        if (sectionContent.length > 0) {
+            sectionContent[sectionContent.length - 1] = new Paragraph({ text: "" }); // Remove last separator
+        }
         
         return [new Paragraph({ text: title, style: "Heading1" }), ...sectionContent];
     };
@@ -295,7 +317,11 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
     const doc = new Document({
         creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
         title: `Plantilla desde Horario - ${schedule.date}`,
-        styles: { paragraphStyles: [ { id: "Heading1", name: "Heading 1", run: { size: 32, bold: true, font: "Arial" }, paragraph: { spacing: { before: 240, after: 240 }, alignment: AlignmentType.CENTER } }] },
+        styles: {
+            paragraphStyles: [
+                { id: "Heading1", name: "Heading 1", run: { size: 32, bold: true, font: "Arial" }, paragraph: { spacing: { before: 240, after: 240 }, alignment: AlignmentType.CENTER } }
+            ]
+        },
         sections: [{ children: [
             ...commonServicesSection,
             ...(sportsEventsSection.length > 0 && commonServicesSection.length > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
@@ -306,13 +332,7 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
     Packer.toBlob(doc).then(blob => saveFile(blob, `plantilla_desde_horario_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
-
-// FIX: Update function to accept lists and include them in the document.
-export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }: {
-    unitList: string[];
-    commandPersonnel: Personnel[];
-    servicePersonnel: Personnel[];
-}) => {
+export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }: { unitList: string[]; commandPersonnel: Personnel[]; servicePersonnel: Personnel[] }) => {
     const instructions = new Paragraph({
         children: [
             new TextRun({
@@ -405,8 +425,109 @@ export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonne
 
 export const exportRosterTemplate = () => {
     const template = {
-        "2025-08-01": { "jefeInspecciones": "APELLIDO, Nombre", "jefeServicio": "APELLIDO, Nombre", "jefeGuardia": "APELLIDO, Nombre", "jefeReserva": "APELLIDO, Nombre" },
-        "2025-08-02": { "jefeServicio": "OTRO APELLIDO, Nombre" }
+        "2025-08-01": {
+            "jefeInspecciones": "APELLIDO, Nombre",
+            "jefeServicio": "APELLIDO, Nombre",
+            "jefeGuardia": "APELLIDO, Nombre",
+            "jefeReserva": "APELLIDO, Nombre"
+        },
+        "2025-08-02": {
+            "jefeServicio": "OTRO APELLIDO, Nombre"
+        }
     };
     saveFile(JSON.stringify(template, null, 2), 'plantilla_rol_de_guardia.json', 'application/json');
+};
+
+export const exportUnitReportToPdf = (reportData: UnitReportData) => {
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 0; // y position is managed by autoTable
+
+    const drawPageHeader = () => {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#c93131'); // Red color for title
+        doc.text("Reporte de Unidades de Bomberos", margin, 15);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(150);
+        const reportDateTime = reportData.reportDate || new Date().toLocaleString('es-AR');
+        doc.text(reportDateTime, pageWidth - margin, 15, { align: 'right' });
+    };
+
+    drawPageHeader(); // Draw header on the first page
+
+    const allRows: any[] = [];
+    
+    reportData.zones.forEach(zone => {
+        allRows.push([{
+            content: zone.name,
+            colSpan: 5,
+            styles: {
+                halign: 'center',
+                fontStyle: 'bold',
+                fillColor: '#b91c1c', // red-700
+                textColor: '#ffffff',
+                fontSize: 12
+            }
+        }]);
+        
+        zone.groups.forEach(group => {
+            allRows.push([{
+                content: group.name,
+                colSpan: 5,
+                styles: {
+                    fontStyle: 'bold',
+                    fillColor: '#3f3f46', // zinc-700
+                    textColor: '#ffffff',
+                    fontSize: 10
+                }
+            }]);
+
+            // Add table data for the group
+            group.units.forEach(unit => {
+                allRows.push([
+                    unit.id,
+                    unit.type,
+                    `${unit.status}${unit.outOfServiceReason ? ` (${unit.outOfServiceReason})` : ''}`,
+                    unit.officerInCharge || '-',
+                    unit.personnelCount ?? '-'
+                ]);
+            });
+        });
+    });
+
+    autoTable(doc, {
+        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'Personal']],
+        body: allRows,
+        startY: 25,
+        theme: 'grid',
+        headStyles: { 
+            fillColor: '#52525b', // zinc-600
+            textColor: '#ffffff',
+            fontStyle: 'bold'
+        },
+        styles: { 
+            fontSize: 8, 
+            cellPadding: 2,
+            font: 'helvetica'
+        },
+        columnStyles: {
+            0: { cellWidth: 40 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 'auto' },
+            4: { cellWidth: 15, halign: 'center' },
+        },
+        didDrawPage: (data) => {
+            if (data.pageNumber > 1) {
+                drawPageHeader();
+            }
+        }
+    });
+
+    doc.save(`Reporte_Unidades_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
 };

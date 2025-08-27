@@ -20,16 +20,16 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
       onClick: onClose
     },
       React.createElement("div", {
-        className: "bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-scale-in",
+        className: "bg-zinc-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-scale-in",
         onClick: handleContentClick
       },
-        React.createElement("header", { className: "flex items-center justify-between p-6 border-b border-gray-700 flex-shrink-0" },
+        React.createElement("header", { className: "flex items-center justify-between p-6 border-b border-zinc-700 flex-shrink-0" },
           React.createElement("h2", { className: "text-2xl font-bold text-white" }, "Guía de Ayuda de la Aplicación"),
-          React.createElement("button", { onClick: onClose, className: "p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white transition-colors" },
+          React.createElement("button", { onClick: onClose, className: "p-1 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors" },
             React.createElement(XIcon, { className: "w-6 h-6" })
           )
         ),
-        React.createElement("main", { className: "p-6 md:p-8 overflow-y-auto space-y-8 text-gray-300" },
+        React.createElement("main", { className: "p-6 md:p-8 overflow-y-auto space-y-8 text-zinc-300" },
           React.createElement("section", null,
             React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Vistas Principales"),
             React.createElement("ul", { className: "list-disc list-inside space-y-2" },
@@ -49,11 +49,11 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
           React.createElement("section", null,
             React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Importar Archivo (Excel o Word)"),
             React.createElement("p", { className: "mb-4" },
-              "Esta función permite añadir o reemplazar los servicios actuales cargando un archivo Excel (", React.createElement("code", { className: "bg-gray-900 px-1 rounded" }, ".xlsx"), ") o Word (", React.createElement("code", { className: "bg-gray-900 px-1 rounded" }, ".docx"), "). Al seleccionar el archivo, la aplicación te preguntará si deseas ", React.createElement("strong", { className: "text-white" }, "\"Añadir\""), " los nuevos servicios a los existentes o ", React.createElement("strong", { className: "text-white" }, "\"Reemplazar\""), " todo el horario."
+              "Esta función permite añadir o reemplazar los servicios actuales cargando un archivo Excel (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".xlsx"), ") o Word (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), "). Al seleccionar el archivo, la aplicación te preguntará si deseas ", React.createElement("strong", { className: "text-white" }, "\"Añadir\""), " los nuevos servicios a los existentes o ", React.createElement("strong", { className: "text-white" }, "\"Reemplazar\""), " todo el horario."
             ),
             React.createElement("h4", { className: "font-semibold text-white mb-2" }, "Formato del Archivo Excel:"),
             React.createElement("p", { className: "mb-3" }, "El archivo debe contener una hoja con las siguientes columnas. Las filas se agrupan automáticamente en servicios basados en el \"Título del Servicio\"."),
-            React.createElement("div", { className: "bg-gray-900/50 p-4 rounded-md border border-gray-700 text-sm" },
+            React.createElement("div", { className: "bg-zinc-900/50 p-4 rounded-md border border-zinc-700 text-sm" },
               React.createElement("ul", { className: "space-y-1" },
                 React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Título del Servicio"), " (Requerido para agrupar)"),
                 React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Descripción del Servicio"), " (Opcional)"),
@@ -62,12 +62,12 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
                 React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Horario de Asignación"), " (Requerido)"),
                 React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Personal de Asignación"), " (Requerido)"),
                 React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Unidad de Asignación"), " (Opcional)"),
-                React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Detalles de Asignación"), " (Opcional, separa con ", React.createElement("code", { className: "bg-gray-700 px-1 rounded" }, ";"), " o saltos de línea)")
+                React.createElement("li", null, React.createElement("code", { className: "text-yellow-300" }, "Detalles de Asignación"), " (Opcional, separa con ", React.createElement("code", { className: "bg-zinc-700 px-1 rounded" }, ";"), " o saltos de línea)")
               )
             ),
             React.createElement("h4", { className: "font-semibold text-white mt-6 mb-2" }, "Formato del Archivo Word:"),
             React.createElement("p", { className: "mb-3" }, "El archivo debe seguir un formato simple de ", React.createElement("strong", { className: "text-white" }, "Clave: Valor"), " en cada línea. Las asignaciones se agrupan bajo el mismo \"Título del Servicio\". La nueva plantilla descargable incluye listas de personal y unidades para facilitar el copiado y pegado de datos correctos."),
-            React.createElement("div", { className: "bg-gray-900/50 p-4 rounded-md border border-gray-700 font-mono text-xs" },
+            React.createElement("div", { className: "bg-zinc-900/50 p-4 rounded-md border border-zinc-700 font-mono text-xs" },
                 React.createElement("p", null, React.createElement("span", { className: "text-yellow-300" }, "Título del Servicio:"), " Ejemplo Servicio 1"),
                 React.createElement("p", null, React.createElement("span", { className: "text-yellow-300" }, "Ubicación de Asignación:"), " Lugar A"),
                 React.createElement("p", null, React.createElement("span", { className: "text-yellow-300" }, "Horario de Asignación:"), " 08:00 Hs."),
@@ -90,8 +90,8 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
           React.createElement("section", null,
             React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Exportar a Word"),
             React.createElement("ul", { className: "list-disc list-inside space-y-2" },
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar General:"), " Genera un documento ", React.createElement("code", { className: "bg-gray-900 px-1 rounded" }, ".docx"), " con el formato de la orden de servicio tradicional, incluyendo la línea de guardia y todos los servicios visibles."),
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar por Hora:"), " Genera un documento ", React.createElement("code", { className: "bg-gray-900 px-1 rounded" }, ".docx"), " que agrupa todas las asignaciones por hora, similar a la \"Vista por Hora\".")
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar General:"), " Genera un documento ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), " con el formato de la orden de servicio tradicional, incluyendo la línea de guardia y todos los servicios visibles."),
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar por Hora:"), " Genera un documento ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), " que agrupa todas las asignaciones por hora, similar a la \"Vista por Hora\".")
             )
           ),
           React.createElement("section", null,
@@ -102,7 +102,7 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
             )
           )
         ),
-        React.createElement("footer", { className: "p-4 bg-gray-900/50 border-t border-gray-700 flex-shrink-0 flex justify-end" },
+        React.createElement("footer", { className: "p-4 bg-zinc-900/50 border-t border-zinc-700 flex-shrink-0 flex justify-end" },
           React.createElement("button", { onClick: onClose, className: "px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors" }, "Cerrar")
         )
       )

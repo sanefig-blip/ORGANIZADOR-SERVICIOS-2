@@ -1,5 +1,5 @@
 {
-  "name": "html-ultimo--organizador-de-servicios-de-bomberos",
+  "name": "listado-unidades",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,9 @@
     "xlsx": "0.18.5",
     "mammoth": "1.8.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

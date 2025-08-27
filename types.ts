@@ -100,3 +100,112 @@ export const rankOrder: { [key in Rank | string]: number } = {
   'AUXILIAR NIVEL H': 16,
   'OTRO': 17
 };
+
+// New types for the Unit Report
+export interface FireUnit {
+  id: string;
+  type: string;
+  status: string;
+  outOfServiceReason?: string;
+  officerInCharge?: string;
+  personnelCount?: number | null;
+  internalId?: string;
+}
+
+export interface UnitGroup {
+  name: string;
+  units: FireUnit[];
+  crewOfficers?: string[];
+  standbyOfficers?: string[];
+  totalPersonnel?: number;
+}
+
+export interface Zone {
+  name: string;
+  groups: UnitGroup[];
+}
+
+export interface UnitReportData {
+  reportDate: string;
+  zones: Zone[];
+}
+
+// New types for ERA Report
+export interface EraEquipment {
+  id: string;
+  brand: string;
+  voltage: string;
+  condition: string;
+  dependency: string;
+}
+
+export interface EraReportStation {
+  name: string;
+  hasEquipment: boolean;
+  equipment: EraEquipment[];
+}
+
+export interface EraData {
+  reportDate: string;
+  stations: EraReportStation[];
+}
+
+
+// SCI Forms Types
+export interface SCI201Action {
+    id: number;
+    time: string;
+    summary: string;
+}
+
+export interface SCI201Data {
+    incidentName: string;
+    prepDateTime: string;
+    incidentLocation: string;
+    evalNature: string;
+    evalThreats: string;
+    evalAffectedArea: string;
+    evalIsolation: string;
+    initialObjectives: string;
+    strategies: string;
+    tactics: string;
+    pcLocation: string;
+    eLocation: string;
+    ingressRoute: string;
+    egressRoute: string;
+    safetyMessage: string;
+    incidentCommander: string;
+    mapOrSketch: string;
+    orgChart: string;
+    actions: SCI201Action[];
+}
+
+export interface SCI211Resource {
+    id: number;
+    requestedBy: string;
+    requestDateTime: string;
+    classType: string; // 'class' is a reserved keyword
+    resourceType: string;
+    arrivalDateTime: string;
+    institution: string;
+    matricula: string;
+    personnelCount: string;
+    status: 'Disponible' | 'No Disponible';
+    assignedTo: string;
+    demobilizedBy: string;
+    demobilizedDateTime: string;
+    observations: string;
+}
+
+export type TriageCategory = 'Rojo' | 'Amarillo' | 'Verde' | 'Negro' | '';
+
+export interface SCI207Victim {
+    id: number;
+    patientName: string;
+    sex: string;
+    age: string;
+    triage: TriageCategory;
+    transportLocation: string;
+    transportedBy: string;
+    transportDateTime: string;
+}

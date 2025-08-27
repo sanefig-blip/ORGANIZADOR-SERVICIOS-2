@@ -37,3 +37,16 @@ export const rankOrder = {
   'AUXILIAR NIVEL H': 16,
   'OTRO': 17
 };
+
+// SCI Forms Types - these are interfaces in TS, but we export them as placeholders
+// The actual shape is defined by usage in the components.
+export const SCI201Action = {};
+export const SCI201Data = {};
+export const SCI211Resource = {};
+export const TriageCategory = '';
+export const SCI207Victim = {};
+
+// ERA Report Types
+export const EraEquipment = {};
+export const EraReportStation = {};
+export const EraData = {};

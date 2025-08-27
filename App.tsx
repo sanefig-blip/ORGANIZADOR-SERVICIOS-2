@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment } from './types.ts';
+import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
+import { unitReportData as preloadedUnitReportData } from './data/unitReportData.ts';
+import { eraData as preloadedEraData } from './data/eraData.ts';
 import { rosterData as preloadedRosterData } from './data/rosterData.ts';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.ts';
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.ts';
@@ -11,7 +13,11 @@ import { parseScheduleFromFile } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
-import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon } from './components/icons.tsx';
+import UnitReportDisplay from './components/UnitReportDisplay.tsx';
+import UnitStatusView from './components/UnitStatusView.tsx';
+import CommandPostView from './components/CommandPostView.tsx';
+import EraReportDisplay from './components/EraReportDisplay.tsx';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';
@@ -34,7 +40,9 @@ const parseDateFromString = (dateString: string): Date => {
 
 const App: React.FC = () => {
     const [schedule, setSchedule] = useState<Schedule | null>(null);
-    const [view, setView] = useState('schedule');
+    const [unitReport, setUnitReport] = useState<UnitReportData | null>(null);
+    const [eraReport, setEraReport] = useState<EraData | null>(null);
+    const [view, setView] = useState('unit-report'); // Default to new view
     const [displayDate, setDisplayDate] = useState<Date | null>(null);
     const [commandPersonnel, setCommandPersonnel] = useState<Personnel[]>([]);
     const [servicePersonnel, setServicePersonnel] = useState<Personnel[]>([]);
@@ -108,6 +116,7 @@ const App: React.FC = () => {
 
 
     useEffect(() => {
+        // Load schedule data
         let scheduleToLoad;
         try {
             const savedScheduleJSON = localStorage.getItem('scheduleData');
@@ -146,11 +155,39 @@ const App: React.FC = () => {
           
         const loadedCommandPersonnel = JSON.parse(localStorage.getItem('commandPersonnel') || JSON.stringify(defaultCommandPersonnel));
         const loadedRoster = JSON.parse(localStorage.getItem('rosterData') || JSON.stringify(preloadedRosterData));
+        
+        let unitReportToLoad;
+        try {
+            const savedUnitReportJSON = localStorage.getItem('unitReportData');
+            unitReportToLoad = savedUnitReportJSON ? JSON.parse(savedUnitReportJSON) : preloadedUnitReportData;
+        } catch (e) {
+            console.error("Failed to load or parse unit report data, falling back to default.", e);
+            unitReportToLoad = preloadedUnitReportData;
+        }
+
+        let eraReportToLoad;
+        try {
+            const savedEraReportJSON = localStorage.getItem('eraReportData');
+            eraReportToLoad = savedEraReportJSON ? JSON.parse(savedEraReportJSON) : preloadedEraData;
+        } catch(e) {
+            console.error("Failed to load or parse ERA report data, falling back to default.", e);
+            eraReportToLoad = preloadedEraData;
+        }
           
         setSchedule(dataCopy);
+        setUnitReport(unitReportToLoad);
+        setEraReport(eraReportToLoad);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
-        setUnitList(JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits)));
+
+        const nomencladorUnits: string[] = JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits));
+        const reportUnits: string[] = unitReportToLoad.zones.flatMap(zone =>
+            zone.groups.flatMap(group => group.units.map(unit => unit.id))
+        );
+        const combinedUnits = [...new Set([...nomencladorUnits, ...reportUnits])];
+        combinedUnits.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        setUnitList(combinedUnits);
+        
         setServiceTemplates(JSON.parse(localStorage.getItem('serviceTemplates') || JSON.stringify(defaultServiceTemplates)));
         setRoster(loadedRoster);
     }, []);
@@ -185,6 +222,16 @@ const App: React.FC = () => {
     const updateAndSaveTemplates = (templates: ServiceTemplate[]) => {
         localStorage.setItem('serviceTemplates', JSON.stringify(templates));
         setServiceTemplates(templates);
+    };
+    
+    const handleUpdateUnitReport = (updatedData: UnitReportData) => {
+        localStorage.setItem('unitReportData', JSON.stringify(updatedData));
+        setUnitReport(updatedData);
+    };
+
+    const handleUpdateEraReport = (updatedData: EraData) => {
+        localStorage.setItem('eraReportData', JSON.stringify(updatedData));
+        setEraReport(updatedData);
     };
 
     const handleUpdateService = (updatedService: Service, type: 'common' | 'sports') => {
@@ -502,22 +549,22 @@ const App: React.FC = () => {
         }
         if(rosterInputRef.current) rosterInputRef.current.value = '';
     };
-
+    
     const handleSaveAsTemplate = (service: Service) => {
         const newTemplate: ServiceTemplate = { ...JSON.parse(JSON.stringify(service)), templateId: `template-${Date.now()}` };
         updateAndSaveTemplates([...serviceTemplates, newTemplate]);
         showToast(`Servicio "${service.title}" guardado como plantilla.`);
     };
 
-    const handleSelectTemplate = (template: ServiceTemplate, { mode, serviceType, serviceToReplaceId }: any) => {
-        setSchedule(prevSchedule => {
+    const handleSelectTemplate = (template: ServiceTemplate, { mode, serviceType, serviceToReplaceId }: { mode: 'add' | 'replace', serviceType: 'common' | 'sports', serviceToReplaceId?: string }) => {
+        setSchedule((prevSchedule: Schedule | null) => {
             if (!prevSchedule) return null;
             const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
-            let newSchedule = { ...prevSchedule };
+            let newSchedule: Schedule = { ...prevSchedule };
 
             if (mode === 'add') {
-                const newService = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
-                delete newService.templateId;
+                const newService: Service = { ...JSON.parse(JSON.stringify(template)), id: `service-from-template-${Date.now()}` };
+                delete (newService as any).templateId;
                 const list = [...newSchedule[listKey]];
                 const firstHiddenIndex = list.findIndex(s => s.isHidden);
                 const insertIndex = firstHiddenIndex === -1 ? list.length : firstHiddenIndex;
@@ -527,8 +574,8 @@ const App: React.FC = () => {
             } else if (mode === 'replace' && serviceToReplaceId) {
                 newSchedule[listKey] = newSchedule[listKey].map((s: Service) => {
                     if (s.id === serviceToReplaceId) {
-                        const updatedService = { ...JSON.parse(JSON.stringify(template)), id: s.id };
-                        delete updatedService.templateId;
+                        const updatedService: Service = { ...JSON.parse(JSON.stringify(template)), id: s.id };
+                        delete (updatedService as any).templateId;
                         return updatedService;
                     }
                     return s;
@@ -544,18 +591,6 @@ const App: React.FC = () => {
     const handleDeleteTemplate = (templateId: string) => {
         const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId)
         updateAndSaveTemplates(newTemplates);
-        showToast(`Plantilla eliminada.`);
-    };
-    
-    const handleAddTemplate = (template: ServiceTemplate) => {
-        const newTemplate = { ...template, templateId: `template-${Date.now()}` };
-        updateAndSaveTemplates([...serviceTemplates, newTemplate]);
-        showToast(`Plantilla "${template.title}" creada.`);
-    };
-
-    const handleUpdateTemplate = (updatedTemplate: ServiceTemplate) => {
-        updateAndSaveTemplates(serviceTemplates.map(t => t.templateId === updatedTemplate.templateId ? updatedTemplate : t));
-        showToast(`Plantilla "${updatedTemplate.title}" actualizada.`);
     };
 
     const handleExportAsTemplate = (format: 'excel' | 'word') => {
@@ -574,7 +609,7 @@ const App: React.FC = () => {
 
     const getAssignmentsByTime = useMemo(() => {
         if (!filteredSchedule) return {};
-        const grouped: { [key: string]: Assignment[] } = {};
+        const grouped: { [time: string]: Assignment[] } = {};
         [...filteredSchedule.services, ...filteredSchedule.sportsEvents].filter(s => !s.isHidden).forEach(service => {
           service.assignments.forEach(assignment => {
             const timeKey = assignment.time;
@@ -598,91 +633,139 @@ const App: React.FC = () => {
     }, [selectedServiceIds, schedule]);
 
     const renderContent = () => {
-        if (!filteredSchedule || !displayDate) return null;
+        if (!displayDate) return null;
         switch (view) {
+            case 'unit-report':
+                if (!unitReport) return null;
+                return (
+                    <UnitReportDisplay
+                        reportData={unitReport}
+                        searchTerm={searchTerm}
+                        onSearchChange={setSearchTerm}
+                        onUpdateReport={handleUpdateUnitReport}
+                        commandPersonnel={commandPersonnel}
+                        servicePersonnel={servicePersonnel}
+                        unitList={unitList}
+                    />
+                );
+            case 'unit-status':
+                if (!unitReport) return null;
+                return <UnitStatusView unitReportData={unitReport} />;
+            case 'command-post':
+                if (!unitReport) return null;
+                return <CommandPostView unitReportData={unitReport} />;
+            case 'era-report':
+                if (!eraReport) return null;
+                return (
+                    <EraReportDisplay
+                        reportData={eraReport}
+                        onUpdateReport={handleUpdateEraReport}
+                    />
+                );
             case 'schedule':
-                return <ScheduleDisplay
-                    schedule={filteredSchedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
-                    onDateChange={handleDateChange} onUpdateService={handleUpdateService} onUpdateCommandStaff={handleUpdateCommandStaff} onAddNewService={handleAddNewService} onMoveService={handleMoveService} onToggleServiceSelection={handleToggleServiceSelection} onSelectAllServices={handleSelectAllServices} onSaveAsTemplate={handleSaveAsTemplate} onReplaceFromTemplate={(serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId })} onImportGuardLine={() => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule.commandStaff, commandPersonnel), true)}
-                    onDeleteService={handleDeleteService}
-                    searchTerm={searchTerm} onSearchChange={setSearchTerm}
-                />;
+                if (!filteredSchedule) return null;
+                return (
+                    <ScheduleDisplay
+                        schedule={filteredSchedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
+                        onDateChange={handleDateChange} onUpdateService={handleUpdateService} onUpdateCommandStaff={handleUpdateCommandStaff} onAddNewService={handleAddNewService} onMoveService={handleMoveService} onToggleServiceSelection={handleToggleServiceSelection} onSelectAllServices={handleSelectAllServices} onSaveAsTemplate={handleSaveAsTemplate} onReplaceFromTemplate={(serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId })} onImportGuardLine={() => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule!.commandStaff, commandPersonnel), true)}
+                        onDeleteService={handleDeleteService}
+                        searchTerm={searchTerm} onSearchChange={setSearchTerm}
+                    />
+                );
             case 'time-grouped':
-                return <TimeGroupedScheduleDisplay assignmentsByTime={getAssignmentsByTime} onAssignmentStatusChange={handleAssignmentStatusChange} />;
+                if (!filteredSchedule) return null;
+                return (
+                    <TimeGroupedScheduleDisplay
+                        assignmentsByTime={getAssignmentsByTime}
+                        onAssignmentStatusChange={handleAssignmentStatusChange}
+                    />
+                );
             case 'nomenclador':
-                return <Nomenclador
-                    commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} units={unitList} roster={roster}
-                    onAddCommandPersonnel={(item) => updateAndSaveCommandPersonnel([...commandPersonnel, item])} onUpdateCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p))} onRemoveCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id))}
-                    onAddServicePersonnel={(item) => updateAndSaveServicePersonnel([...servicePersonnel, item])} onUpdateServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p))} onRemoveServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id))}
-                    onUpdateUnits={updateAndSaveUnits} onUpdateRoster={updateAndSaveRoster}
-                    serviceTemplates={serviceTemplates}
-                    onAddTemplate={handleAddTemplate}
-                    onUpdateTemplate={handleUpdateTemplate}
-                    onRemoveTemplate={handleDeleteTemplate}
-                 />;
+                return (
+                    <Nomenclador
+                        commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} units={unitList} roster={roster}
+                        onAddCommandPersonnel={(item) => updateAndSaveCommandPersonnel([...commandPersonnel, item])} onUpdateCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p))} onRemoveCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id))}
+                        onAddServicePersonnel={(item) => updateAndSaveServicePersonnel([...servicePersonnel, item])} onUpdateServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p))} onRemoveServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id))}
+                        onUpdateUnits={updateAndSaveUnits} onUpdateRoster={updateAndSaveRoster}
+                     />
+                 );
             default:
                 return null;
         }
     };
-
-    const getButtonClass = (buttonView: string) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`;
     
-    if (!schedule || !displayDate) {
-        return <div className="bg-gray-900 text-white min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div></div>;
+    const getButtonClass = (buttonView: string) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`;
+    
+    if (!schedule || !displayDate || !unitReport || !eraReport) {
+        return (
+            <div className="bg-zinc-900 text-white min-h-screen flex justify-center items-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" />
+            </div>
+        );
     }
 
     return (
-        <div className="bg-gray-900 text-white min-h-screen font-sans">
+        <div className="bg-zinc-900 text-white min-h-screen font-sans">
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx,.ods" />
             <input type="file" ref={rosterInputRef} onChange={handleRosterImport} style={{ display: 'none' }} accept=".json" />
-            <header className="bg-gray-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
+            <header className="bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0">
                         <div className="flex items-center mb-4 sm:mb-0">
-                            <button onClick={handleResetData} className="mr-2 text-gray-400 hover:text-white transition-colors" aria-label="Reiniciar Datos"><RefreshIcon className="w-6 h-6" /></button>
-                            <button onClick={() => setIsHelpModalOpen(true)} className="mr-4 text-gray-400 hover:text-white transition-colors" aria-label="Ayuda"><QuestionMarkCircleIcon className="w-6 h-6" /></button>
-                            <CalendarIcon className="w-10 h-10 text-blue-400 mr-3" />
+                            <button onClick={handleResetData} className="mr-2 text-zinc-400 hover:text-white transition-colors" aria-label="Reiniciar Datos"><RefreshIcon className="w-6 h-6" /></button>
+                            <button onClick={() => setIsHelpModalOpen(true)} className="mr-4 text-zinc-400 hover:text-white transition-colors" aria-label="Ayuda"><QuestionMarkCircleIcon className="w-6 h-6" /></button>
+                            <img src="https://ci.bomberosdelaciudad.gob.ar/img/logo-bomberos-header-blanco.png" alt="Logo Bomberos de la Ciudad" className="h-12 mr-4" />
                             <div>
-                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Servicios del Cuerpo de Bomberos de la Ciudad</h1>
-                                <p className="text-xs text-gray-400">Planificador de Guardia</p>
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Bomberos de la Ciudad</h1>
+                                <p className="text-xs text-zinc-400">Organizador de Unidades y Guardia</p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Vista General</button>
+                            <button className={getButtonClass('unit-report')} onClick={() => setView('unit-report')}><FireIcon className="w-5 h-5" /> Reporte de Unidades</button>
+                            <button className={getButtonClass('unit-status')} onClick={() => setView('unit-status')}><FilterIcon className="w-5 h-5" /> Estado de Unidades</button>
+                            <button className={getButtonClass('command-post')} onClick={() => setView('command-post')}><AnnotationIcon className="w-5 h-5" /> Puesto Comando</button>
+                            <button className={getButtonClass('era-report')} onClick={() => setView('era-report')}><LightningBoltIcon className="w-5 h-5" /> Trasvazadores E.R.A.</button>
+                            <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Planificador</button>
                             <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className="w-5 h-5" /> Vista por Hora</button>
                             <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className="w-5 h-5" /> Nomencladores</button>
-                            <button onClick={() => openTemplateModal({ mode: 'add', serviceType: 'common' })} className="flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors"><BookmarkIcon className="w-5 h-5" /> Añadir desde Plantilla</button>
                             
                             <div className="relative" ref={importMenuRef}>
-                                <button onClick={() => setImportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors'>
-                                    <UploadIcon className='w-5 h-5' />
+                                <button onClick={() => setImportMenuOpen(prev => !prev)} className={'flex items-center gap-2 px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors'}>
+                                    <UploadIcon className={'w-5 h-5'} />
                                     <span>Importar</span>
                                     <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
-                                {isImportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
-                                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                            <UploadIcon className='w-4 h-4' /> Importar Rol</a>
-                                        <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                            <UploadIcon className='w-4 h-4' /> Importar Servicios</a>
+                                {isImportMenuOpen && (
+                                    <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                        <div className="py-1" role="menu" aria-orientation="vertical">
+                                            <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                                <UploadIcon className={'w-4 h-4'} /> Importar Horario (Word/Excel)
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                                <UploadIcon className={'w-4 h-4'} /> Importar Rol de Guardia (.json)
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                                <BookmarkIcon className={'w-4 h-4'} /> Añadir desde Plantilla
+                                            </a>
+                                        </div>
                                     </div>
-                                </div>}
+                                )}
                             </div>
 
                             <div className="relative" ref={exportMenuRef}>
-                                <button onClick={() => setExportMenuOpen(prev => !prev)} className='flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'>
-                                    <DownloadIcon className='w-5 h-5' />
+                                <button onClick={() => setExportMenuOpen(prev => !prev)} className={'flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'}>
+                                    <DownloadIcon className={'w-5 h-5'} />
                                     <span>Exportar</span>
                                     <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
-                                {isExportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                {isExportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
                                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className='w-4 h-4' /> Exportar General</a>
-                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className='w-4 h-4' /> Exportar por Hora</a>
-                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className='w-4 h-4' /> Exportar Plantilla</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule!, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className={'w-4 h-4'} /> Exportar General</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className={'w-4 h-4'} /> Exportar por Hora</a>
+                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                            <DownloadIcon className={'w-4 h-4'} /> Exportar Plantilla</a>
                                     </div>
                                 </div>}
                             </div>
@@ -700,13 +783,12 @@ const App: React.FC = () => {
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
                 {renderContent()}
             </main>
-            {/* FIX: Pass personnel lists to HelpModal */}
             {isHelpModalOpen && <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} unitList={unitList} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} />}
             {isRosterModalOpen && <RosterImportModal isOpen={isRosterModalOpen} onClose={() => setIsRosterModalOpen(false)} onConfirm={() => rosterInputRef.current?.click()} />}
-            {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps)} onDeleteTemplate={handleDeleteTemplate} />}
+            {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps as any)} onDeleteTemplate={handleDeleteTemplate} />}
             {isExportTemplateModalOpen && <ExportTemplateModal isOpen={isExportTemplateModalOpen} onClose={() => setIsExportTemplateModalOpen(false)} onExport={handleExportAsTemplate} />}
         </div>
     );
-}
+};
 
 export default App;

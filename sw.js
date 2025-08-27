@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fire-dept-organizer-cache-v3';
+const CACHE_NAME = 'fire-dept-organizer-cache-v5';
 const urlsToCache = [
   './',
   './index.html',
@@ -16,6 +16,10 @@ const urlsToCache = [
   './components/RosterImportModal.js',
   './components/ServiceTemplateModal.js',
   './components/ExportTemplateModal.js',
+  './components/UnitReportDisplay.js',
+  './components/UnitStatusView.js',
+  './components/CommandPostView.js',
+  './components/EraReportDisplay.js',
   './services/geminiService.js',
   './services/exportService.js',
   './services/wordImportService.js',
@@ -25,6 +29,8 @@ const urlsToCache = [
   './data/servicePersonnelData.js',
   './data/unitData.js',
   './data/serviceTemplates.js',
+  './data/unitReportData.js',
+  './data/eraData.js',
   'https://cdn.tailwindcss.com',
   'https://esm.sh/docx@8.5.0',
   'https://esm.sh/xlsx@0.18.5',

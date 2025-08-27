@@ -1,5 +1,7 @@
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Helper to save files
 const saveFile = (data, fileName, fileType) => {
@@ -394,4 +396,98 @@ export const exportRosterTemplate = () => {
         "2025-08-02": { "jefeServicio": "OTRO APELLIDO, Nombre" }
     };
     saveFile(JSON.stringify(template, null, 2), 'plantilla_rol_de_guardia.json', 'application/json');
+};
+
+export const exportUnitReportToPdf = (reportData) => {
+    const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 0; // y position is managed by autoTable
+
+    const drawPageHeader = () => {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#c93131'); // Red color for title
+        doc.text("Reporte de Unidades de Bomberos", margin, 15);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(150);
+        const reportDateTime = reportData.reportDate || new Date().toLocaleString('es-AR');
+        doc.text(reportDateTime, pageWidth - margin, 15, { align: 'right' });
+    };
+
+    drawPageHeader(); // Draw header on the first page
+
+    const allRows = [];
+    
+    reportData.zones.forEach(zone => {
+        allRows.push([{
+            content: zone.name,
+            colSpan: 5,
+            styles: {
+                halign: 'center',
+                fontStyle: 'bold',
+                fillColor: '#b91c1c', // red-700
+                textColor: '#ffffff',
+                fontSize: 12
+            }
+        }]);
+        
+        zone.groups.forEach(group => {
+            allRows.push([{
+                content: group.name,
+                colSpan: 5,
+                styles: {
+                    fontStyle: 'bold',
+                    fillColor: '#3f3f46', // zinc-700
+                    textColor: '#ffffff',
+                    fontSize: 10
+                }
+            }]);
+
+            // Add table data for the group
+            group.units.forEach(unit => {
+                allRows.push([
+                    unit.id,
+                    unit.type,
+                    `${unit.status}${unit.outOfServiceReason ? ` (${unit.outOfServiceReason})` : ''}`,
+                    unit.officerInCharge || '-',
+                    unit.personnelCount ?? '-'
+                ]);
+            });
+        });
+    });
+
+    autoTable(doc, {
+        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'Personal']],
+        body: allRows,
+        startY: 25,
+        theme: 'grid',
+        headStyles: { 
+            fillColor: '#52525b', // zinc-600
+            textColor: '#ffffff',
+            fontStyle: 'bold'
+        },
+        styles: { 
+            fontSize: 8, 
+            cellPadding: 2,
+            font: 'helvetica'
+        },
+        columnStyles: {
+            0: { cellWidth: 40 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 35 },
+            3: { cellWidth: 'auto' },
+            4: { cellWidth: 15, halign: 'center' },
+        },
+        didDrawPage: (data) => {
+            if (data.pageNumber > 1) {
+                drawPageHeader();
+            }
+        }
+    });
+
+    doc.save(`Reporte_Unidades_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
 };

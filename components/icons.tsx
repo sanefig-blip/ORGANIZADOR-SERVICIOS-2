@@ -166,3 +166,21 @@ export const GripVerticalIcon = ({ className }: { className?: string }) => (
         <path d="M5 4a1 1 0 112 0 1 1 0 01-2 0zM5 8a1 1 0 112 0 1 1 0 01-2 0zM5 12a1 1 0 112 0 1 1 0 01-2 0zM9 4a1 1 0 112 0 1 1 0 01-2 0zM9 8a1 1 0 112 0 1 1 0 01-2 0zM9 12a1 1 0 112 0 1 1 0 01-2 0zM13 4a1 1 0 112 0 1 1 0 01-2 0zM13 8a1 1 0 112 0 1 1 0 01-2 0zM13 12a1 1 0 112 0 1 1 0 01-2 0z" />
     </svg>
 );
+
+export const FireIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+        <path d="M5.541 4.316C6.236 3.5 7.22 3 8.5 3c1.325 0 2.342.553 3.016 1.428.646.836.984 1.86.984 3.072 0 1.18-.328 2.195-.916 3.084-.589.89-1.432 1.572-2.584 2.228V17a1 1 0 11-2 0v-4.182c-1.152-.656-1.995-1.338-2.584-2.228-.588-.889-.916-1.903-.916-3.084 0-1.212.338-2.236.984-3.072z" />
+    </svg>
+);
+
+export const FilterIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+    </svg>
+);
+
+export const LightningBoltIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+);

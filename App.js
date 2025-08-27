@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
+import { unitReportData as preloadedUnitReportData } from './data/unitReportData.js';
+import { eraData as preloadedEraData } from './data/eraData.js';
 import { rosterData as preloadedRosterData } from './data/rosterData.js';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.js';
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.js';
 import { defaultUnits } from './data/unitData.js';
 import { defaultServiceTemplates } from './data/serviceTemplates.js';
-import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate, exportExcelTemplate, exportWordTemplate } from './services/exportService.js';
+import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.js';
 import { parseScheduleFromFile } from './services/wordImportService.js';
 import ScheduleDisplay from './components/ScheduleDisplay.js';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.js';
 import Nomenclador from './components/Nomenclador.js';
-import { CalendarIcon, BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon } from './components/icons.js';
+import UnitReportDisplay from './components/UnitReportDisplay.js';
+import UnitStatusView from './components/UnitStatusView.js';
+import CommandPostView from './components/CommandPostView.js';
+import EraReportDisplay from './components/EraReportDisplay.js';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.js';
 import HelpModal from './components/HelpModal.js';
 import RosterImportModal from './components/RosterImportModal.js';
 import ServiceTemplateModal from './components/ServiceTemplateModal.js';
@@ -34,7 +40,9 @@ const parseDateFromString = (dateString) => {
 
 const App = () => {
     const [schedule, setSchedule] = useState(null);
-    const [view, setView] = useState('schedule');
+    const [unitReport, setUnitReport] = useState(null);
+    const [eraReport, setEraReport] = useState(null);
+    const [view, setView] = useState('unit-report'); // Default to new view
     const [displayDate, setDisplayDate] = useState(null);
     const [commandPersonnel, setCommandPersonnel] = useState([]);
     const [servicePersonnel, setServicePersonnel] = useState([]);
@@ -146,11 +154,39 @@ const App = () => {
           
         const loadedCommandPersonnel = JSON.parse(localStorage.getItem('commandPersonnel') || JSON.stringify(defaultCommandPersonnel));
         const loadedRoster = JSON.parse(localStorage.getItem('rosterData') || JSON.stringify(preloadedRosterData));
+        
+        let unitReportToLoad;
+        try {
+            const savedUnitReportJSON = localStorage.getItem('unitReportData');
+            unitReportToLoad = savedUnitReportJSON ? JSON.parse(savedUnitReportJSON) : preloadedUnitReportData;
+        } catch (e) {
+            console.error("Failed to load or parse unit report data, falling back to default.", e);
+            unitReportToLoad = preloadedUnitReportData;
+        }
+
+        let eraReportToLoad;
+        try {
+            const savedEraReportJSON = localStorage.getItem('eraReportData');
+            eraReportToLoad = savedEraReportJSON ? JSON.parse(savedEraReportJSON) : preloadedEraData;
+        } catch(e) {
+            console.error("Failed to load or parse ERA report data, falling back to default.", e);
+            eraReportToLoad = preloadedEraData;
+        }
           
         setSchedule(dataCopy);
+        setUnitReport(unitReportToLoad);
+        setEraReport(eraReportToLoad);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
-        setUnitList(JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits)));
+
+        const nomencladorUnits = JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits));
+        const reportUnits = unitReportToLoad.zones.flatMap(zone =>
+            zone.groups.flatMap(group => group.units.map(unit => unit.id))
+        );
+        const combinedUnits = [...new Set([...nomencladorUnits, ...reportUnits])];
+        combinedUnits.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        setUnitList(combinedUnits);
+        
         setServiceTemplates(JSON.parse(localStorage.getItem('serviceTemplates') || JSON.stringify(defaultServiceTemplates)));
         setRoster(loadedRoster);
     }, []);
@@ -185,6 +221,16 @@ const App = () => {
     const updateAndSaveTemplates = (templates) => {
         localStorage.setItem('serviceTemplates', JSON.stringify(templates));
         setServiceTemplates(templates);
+    };
+    
+    const handleUpdateUnitReport = (updatedData) => {
+        localStorage.setItem('unitReportData', JSON.stringify(updatedData));
+        setUnitReport(updatedData);
+    };
+
+    const handleUpdateEraReport = (updatedData) => {
+        localStorage.setItem('eraReportData', JSON.stringify(updatedData));
+        setEraReport(updatedData);
     };
 
     const handleUpdateService = (updatedService, type) => {
@@ -502,7 +548,7 @@ const App = () => {
         }
         if(rosterInputRef.current) rosterInputRef.current.value = '';
     };
-
+    
     const handleSaveAsTemplate = (service) => {
         const newTemplate = { ...JSON.parse(JSON.stringify(service)), templateId: `template-${Date.now()}` };
         updateAndSaveTemplates([...serviceTemplates, newTemplate]);
@@ -510,7 +556,7 @@ const App = () => {
     };
 
     const handleSelectTemplate = (template, { mode, serviceType, serviceToReplaceId }) => {
-        setSchedule(prevSchedule => {
+        setSchedule((prevSchedule) => {
             if (!prevSchedule) return null;
             const listKey = serviceType === 'common' ? 'services' : 'sportsEvents';
             let newSchedule = { ...prevSchedule };
@@ -542,20 +588,8 @@ const App = () => {
     };
 
     const handleDeleteTemplate = (templateId) => {
-        const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId);
+        const newTemplates = serviceTemplates.filter(t => t.templateId !== templateId)
         updateAndSaveTemplates(newTemplates);
-        showToast(`Plantilla eliminada.`);
-    };
-
-    const handleAddTemplate = (template) => {
-        const newTemplate = { ...template, templateId: `template-${Date.now()}` };
-        updateAndSaveTemplates([...serviceTemplates, newTemplate]);
-        showToast(`Plantilla "${template.title}" creada.`);
-    };
-
-    const handleUpdateTemplate = (updatedTemplate) => {
-        updateAndSaveTemplates(serviceTemplates.map(t => t.templateId === updatedTemplate.templateId ? updatedTemplate : t));
-        showToast(`Plantilla "${updatedTemplate.title}" actualizada.`);
     };
 
     const handleExportAsTemplate = (format) => {
@@ -598,73 +632,111 @@ const App = () => {
     }, [selectedServiceIds, schedule]);
 
     const renderContent = () => {
-        if (!filteredSchedule || !displayDate) return null;
+        if (!displayDate) return null;
         switch (view) {
+            case 'unit-report':
+                if (!unitReport) return null;
+                return React.createElement(UnitReportDisplay, {
+                        reportData: unitReport,
+                        searchTerm: searchTerm,
+                        onSearchChange: setSearchTerm,
+                        onUpdateReport: handleUpdateUnitReport,
+                        commandPersonnel: commandPersonnel,
+                        servicePersonnel: servicePersonnel,
+                        unitList: unitList
+                    });
+            case 'unit-status':
+                if (!unitReport) return null;
+                return React.createElement(UnitStatusView, { unitReportData: unitReport });
+            case 'command-post':
+                if (!unitReport) return null;
+                return React.createElement(CommandPostView, { unitReportData: unitReport });
+            case 'era-report':
+                if (!eraReport) return null;
+                return React.createElement(EraReportDisplay, {
+                        reportData: eraReport,
+                        onUpdateReport: handleUpdateEraReport
+                    });
             case 'schedule':
+                if (!filteredSchedule) return null;
                 return React.createElement(ScheduleDisplay, {
-                    schedule: filteredSchedule, displayDate: displayDate, selectedServiceIds: selectedServiceIds, commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, unitList: unitList,
-                    onDateChange: handleDateChange, onUpdateService: handleUpdateService, onUpdateCommandStaff: handleUpdateCommandStaff, onAddNewService: handleAddNewService, onMoveService: handleMoveService, onToggleServiceSelection: handleToggleServiceSelection, onSelectAllServices: handleSelectAllServices, onSaveAsTemplate: handleSaveAsTemplate, onReplaceFromTemplate: (serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId }), onImportGuardLine: () => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule.commandStaff, commandPersonnel), true),
-                    onDeleteService: handleDeleteService,
-                    searchTerm: searchTerm, onSearchChange: setSearchTerm
-                });
+                        schedule: filteredSchedule, displayDate: displayDate, selectedServiceIds: selectedServiceIds, commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, unitList: unitList,
+                        onDateChange: handleDateChange, onUpdateService: handleUpdateService, onUpdateCommandStaff: handleUpdateCommandStaff, onAddNewService: handleAddNewService, onMoveService: handleMoveService, onToggleServiceSelection: handleToggleServiceSelection, onSelectAllServices: handleSelectAllServices, onSaveAsTemplate: handleSaveAsTemplate, onReplaceFromTemplate: (serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId }), onImportGuardLine: () => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule.commandStaff, commandPersonnel), true),
+                        onDeleteService: handleDeleteService,
+                        searchTerm: searchTerm, onSearchChange: setSearchTerm,
+                    });
             case 'time-grouped':
-                return React.createElement(TimeGroupedScheduleDisplay, { assignmentsByTime: getAssignmentsByTime, onAssignmentStatusChange: handleAssignmentStatusChange });
+                if (!filteredSchedule) return null;
+                return React.createElement(TimeGroupedScheduleDisplay, {
+                        assignmentsByTime: getAssignmentsByTime,
+                        onAssignmentStatusChange: handleAssignmentStatusChange
+                    });
             case 'nomenclador':
                 return React.createElement(Nomenclador, {
-                    commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, units: unitList, roster: roster,
-                    onAddCommandPersonnel: (item) => updateAndSaveCommandPersonnel([...commandPersonnel, item]), onUpdateCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p)), onRemoveCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id)),
-                    onAddServicePersonnel: (item) => updateAndSaveServicePersonnel([...servicePersonnel, item]), onUpdateServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p)), onRemoveServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id)),
-                    onUpdateUnits: updateAndSaveUnits, onUpdateRoster: updateAndSaveRoster,
-                    serviceTemplates: serviceTemplates,
-                    onAddTemplate: handleAddTemplate,
-                    onUpdateTemplate: handleUpdateTemplate,
-                    onRemoveTemplate: handleDeleteTemplate
-                 });
+                        commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, units: unitList, roster: roster,
+                        onAddCommandPersonnel: (item) => updateAndSaveCommandPersonnel([...commandPersonnel, item]), onUpdateCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p)), onRemoveCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id)),
+                        onAddServicePersonnel: (item) => updateAndSaveServicePersonnel([...servicePersonnel, item]), onUpdateServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p)), onRemoveServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id)),
+                        onUpdateUnits: updateAndSaveUnits, onUpdateRoster: updateAndSaveRoster
+                     });
             default:
                 return null;
         }
     };
-
-    const getButtonClass = (buttonView) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`;
     
-    if (!schedule || !displayDate) {
-        return React.createElement("div", { className: "bg-gray-900 text-white min-h-screen flex justify-center items-center" }, React.createElement("div", { className: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" }));
+    const getButtonClass = (buttonView) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`;
+    
+    if (!schedule || !displayDate || !unitReport || !eraReport) {
+        return (
+            React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen flex justify-center items-center" },
+                React.createElement("div", { className: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" })
+            )
+        );
     }
 
     return (
-        React.createElement("div", { className: "bg-gray-900 text-white min-h-screen font-sans" },
+        React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen font-sans" },
             React.createElement("input", { type: "file", ref: fileInputRef, onChange: handleFileImport, style: { display: 'none' }, accept: ".xlsx,.xls,.docx,.ods" }),
             React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json" }),
-            React.createElement("header", { className: "bg-gray-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
+            React.createElement("header", { className: "bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
                 React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
                     React.createElement("div", { className: "flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0" },
                         React.createElement("div", { className: "flex items-center mb-4 sm:mb-0" },
-                            React.createElement("button", { onClick: handleResetData, className: "mr-2 text-gray-400 hover:text-white transition-colors", "aria-label": "Reiniciar Datos" }, React.createElement(RefreshIcon, { className: "w-6 h-6" })),
-                            React.createElement("button", { onClick: () => setIsHelpModalOpen(true), className: "mr-4 text-gray-400 hover:text-white transition-colors", "aria-label": "Ayuda" }, React.createElement(QuestionMarkCircleIcon, { className: "w-6 h-6" })),
-                            React.createElement(CalendarIcon, { className: "w-10 h-10 text-blue-400 mr-3" }),
+                            React.createElement("button", { onClick: handleResetData, className: "mr-2 text-zinc-400 hover:text-white transition-colors", "aria-label": "Reiniciar Datos"}, React.createElement(RefreshIcon, { className: "w-6 h-6" })),
+                            React.createElement("button", { onClick: () => setIsHelpModalOpen(true), className: "mr-4 text-zinc-400 hover:text-white transition-colors", "aria-label": "Ayuda"}, React.createElement(QuestionMarkCircleIcon, { className: "w-6 h-6" })),
+                            React.createElement("img", { src: "https://ci.bomberosdelaciudad.gob.ar/img/logo-bomberos-header-blanco.png", alt: "Logo Bomberos de la Ciudad", className: "h-12 mr-4" }),
                             React.createElement("div", null,
-                                React.createElement("h1", { className: "text-xl sm:text-2xl font-bold tracking-tight" }, "Servicios del Cuerpo de Bomberos de la Ciudad"),
-                                React.createElement("p", { className: "text-xs text-gray-400" }, "Planificador de Guardia")
+                                React.createElement("h1", { className: "text-xl sm:text-2xl font-bold tracking-tight" }, "Bomberos de la Ciudad"),
+                                React.createElement("p", { className: "text-xs text-zinc-400" }, "Organizador de Unidades y Guardia")
                             )
                         ),
                         React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },
-                            React.createElement("button", { className: getButtonClass('schedule'), onClick: () => setView('schedule') }, React.createElement(ClipboardListIcon, { className: "w-5 h-5" }), " Vista General"),
+                            React.createElement("button", { className: getButtonClass('unit-report'), onClick: () => setView('unit-report') }, React.createElement(FireIcon, { className: "w-5 h-5" }), " Reporte de Unidades"),
+                            React.createElement("button", { className: getButtonClass('unit-status'), onClick: () => setView('unit-status') }, React.createElement(FilterIcon, { className: "w-5 h-5" }), " Estado de Unidades"),
+                            React.createElement("button", { className: getButtonClass('command-post'), onClick: () => setView('command-post') }, React.createElement(AnnotationIcon, { className: "w-5 h-5" }), " Puesto Comando"),
+                            React.createElement("button", { className: getButtonClass('era-report'), onClick: () => setView('era-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Trasvazadores E.R.A."),
+                            React.createElement("button", { className: getButtonClass('schedule'), onClick: () => setView('schedule') }, React.createElement(ClipboardListIcon, { className: "w-5 h-5" }), " Planificador"),
                             React.createElement("button", { className: getButtonClass('time-grouped'), onClick: () => setView('time-grouped') }, React.createElement(ClockIcon, { className: "w-5 h-5" }), " Vista por Hora"),
                             React.createElement("button", { className: getButtonClass('nomenclador'), onClick: () => setView('nomenclador') }, React.createElement(BookOpenIcon, { className: "w-5 h-5" }), " Nomencladores"),
-                            React.createElement("button", { onClick: () => openTemplateModal({ mode: 'add', serviceType: 'common' }), className: "flex items-center gap-2 px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors" }, React.createElement(BookmarkIcon, { className: "w-5 h-5" }), " Añadir desde Plantilla"),
                             
                             React.createElement("div", { className: "relative", ref: importMenuRef },
-                                React.createElement("button", { onClick: () => setImportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors' },
+                                React.createElement("button", { onClick: () => setImportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors' },
                                     React.createElement(UploadIcon, { className: 'w-5 h-5' }),
                                     React.createElement("span", null, "Importar"),
                                     React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}` })
                                 ),
-                                isImportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
-                                    React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" },
-                                            React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol"),
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" },
-                                            React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Servicios")
+                                isImportMenuOpen && (
+                                    React.createElement("div", { className: "absolute right-0 mt-2 w-64 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                        React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical" },
+                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Horario (Word/Excel)"
+                                            ),
+                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"
+                                            ),
+                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(BookmarkIcon, { className: 'w-4 h-4' }), " Añadir desde Plantilla"
+                                            )
+                                        )
                                     )
                                 )
                             ),
@@ -675,20 +747,20 @@ const App = () => {
                                     React.createElement("span", null, "Exportar"),
                                     React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}` })
                                 ),
-                                isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                     React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" },
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar General"),
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" },
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar por Hora"),
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 w-full text-left", role: "menuitem" },
+                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar Plantilla")
                                     )
                                 )
                             ),
                             
                             selectedServiceIds.size > 0 && view === 'schedule' && (
-                                React.createElement("button", { onClick: handleToggleVisibilityForSelected, className: `flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}` },
+                                React.createElement("button", { onClick: handleToggleVisibilityForSelected, className: `flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}`},
                                     visibilityAction.action === 'hide' ? React.createElement(EyeOffIcon, { className: "w-5 h-5" }) : React.createElement(EyeIcon, { className: "w-5 h-5" }),
                                     `${visibilityAction.label} (${selectedServiceIds.size})`
                                 )
@@ -706,6 +778,6 @@ const App = () => {
             isExportTemplateModalOpen && React.createElement(ExportTemplateModal, { isOpen: isExportTemplateModalOpen, onClose: () => setIsExportTemplateModalOpen(false), onExport: handleExportAsTemplate })
         )
     );
-}
+};
 
 export default App;

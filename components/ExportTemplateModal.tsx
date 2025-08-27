@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons';
 
@@ -19,17 +20,17 @@ const ExportTemplateModal: React.FC<ExportTemplateModalProps> = ({ isOpen, onClo
       role="dialog"
     >
       <div
-        className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-scale-in"
+        className="bg-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between p-6 border-b border-gray-700">
+        <header className="flex items-center justify-between p-6 border-b border-zinc-700">
           <h2 className="text-2xl font-bold text-white">Exportar Como Plantilla</h2>
-          <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-1 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors">
             <XIcon className="w-6 h-6" />
           </button>
         </header>
 
-        <main className="p-6 md:p-8 space-y-6 text-gray-300">
+        <main className="p-6 md:p-8 space-y-6 text-zinc-300">
           <p>
             Exporta el horario actual como un archivo de plantilla que puede ser modificado y re-importado.
           </p>
