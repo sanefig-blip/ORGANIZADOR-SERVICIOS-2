@@ -85,7 +85,7 @@ const EraReportDisplay = ({ reportData, onUpdateReport }) => {
     React.createElement("div", { className: "animate-fade-in" },
         React.createElement("div", { className: "mb-6 bg-zinc-800/60 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start gap-4" },
             React.createElement("div", null,
-                React.createElement("h2", { className: "text-3xl font-bold text-white" }, "Trasvazadores de E.R.A. y Grupos Electrógenos"),
+                React.createElement("h2", { className: "text-3xl font-bold text-white" }, "Trasvazadores de E.R.A."),
                 React.createElement("p", { className: "text-zinc-400" }, "Fecha del reporte: ", reportData.reportDate)
             ),
              React.createElement("div", { className: "flex items-center gap-2 self-start sm:self-center" },
@@ -129,10 +129,28 @@ const EraReportDisplay = ({ reportData, onUpdateReport }) => {
                                 )
                             );
                         }
+                        if (station.equipment.length === 0) {
+                            return (
+                                React.createElement("tr", { key: station.name, className: "border-t border-zinc-700" },
+                                    React.createElement("td", { className: "p-3 font-semibold text-yellow-300 align-top" },
+                                        isEditing ? (
+                                            React.createElement("div", { className: "flex flex-col items-start gap-2" },
+                                                React.createElement("div", { className: "flex items-center gap-2" },
+                                                    React.createElement("input", { type: "checkbox", checked: station.hasEquipment, onChange: (e) => handleStationChange(stationIdx, 'hasEquipment', e.target.checked), className: "h-4 w-4 bg-zinc-600 border-zinc-500 rounded text-blue-500 focus:ring-blue-500" }),
+                                                    React.createElement("span", null, station.name)
+                                                ),
+                                                React.createElement("button", { onClick: () => handleAddEquipment(stationIdx), className: "flex items-center gap-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded text-white" }, React.createElement(PlusCircleIcon, { className: "w-4 h-4" }), " Añadir")
+                                            )
+                                        ) : station.name
+                                    ),
+                                    React.createElement("td", { colSpan: isEditing ? 5 : 4, className: "p-3 text-center text-zinc-500 italic" }, "No hay equipos para esta estación.")
+                                )
+                            );
+                        }
                         return station.equipment.map((equip, equipIdx) => (
                             React.createElement("tr", { key: equip.id, className: "border-t border-zinc-700 hover:bg-zinc-700/50" },
                                 equipIdx === 0 && (
-                                    React.createElement("td", { rowSpan: station.equipment.length > 0 ? station.equipment.length : 1, className: "p-3 font-semibold text-yellow-300 align-top" },
+                                    React.createElement("td", { rowSpan: station.equipment.length, className: "p-3 font-semibold text-yellow-300 align-top" },
                                          isEditing ? (
                                             React.createElement("div", { className: "flex flex-col items-start gap-2" },
                                                 React.createElement("div", { className: "flex items-center gap-2" },
