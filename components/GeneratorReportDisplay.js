@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons.js';
 import { exportGeneratorReportToPdf } from '../services/exportService.js';
@@ -88,7 +89,7 @@ const GeneratorReportDisplay = ({ reportData, onUpdateReport }) => {
         React.createElement("div", { className: "mb-6 bg-zinc-800/60 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start gap-4" },
             React.createElement("div", null,
                 React.createElement("h2", { className: "text-3xl font-bold text-white" }, "Grupos Electrógenos"),
-                React.createElement("p", { className: "text-zinc-400" }, "Fecha del reporte: ", reportData.reportDate)
+                React.createElement("p", { className: "text-zinc-400" }, "Fecha del reporte: ", new Date().toLocaleString('es-AR'))
             ),
              React.createElement("div", { className: "flex items-center gap-2 self-start sm:self-center" },
                  isEditing ? (

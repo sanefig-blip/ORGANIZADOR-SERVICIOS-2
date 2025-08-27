@@ -555,18 +555,23 @@ export const exportEraReportToPdf = (reportData) => {
     doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
     y += 10;
 
-    const body = reportData.stations.flatMap(station => {
+    const body = reportData.stations.reduce((acc, station) => {
         if (!station.hasEquipment || station.equipment.length === 0) {
-            return [[{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]];
+            acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            station.equipment.forEach((equip, index) => {
+                acc.push([
+                    index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    equip.brand,
+                    equip.voltage,
+                    equip.condition,
+                    equip.dependency
+                ]);
+            });
         }
-        return station.equipment.map((equip, index) => [
-            index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
-            equip.brand,
-            equip.voltage,
-            equip.condition,
-            equip.dependency
-        ]);
-    });
+        return acc;
+    }, []);
+    
 
     autoTable(doc, {
         head: [['ESTACIÓN', 'MARCA', 'VOLTAJE', 'COND.', 'DEPENDENCIA']],
@@ -595,18 +600,22 @@ export const exportGeneratorReportToPdf = (reportData) => {
     doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
     y += 10;
 
-    const body = reportData.stations.flatMap(station => {
+    const body = reportData.stations.reduce((acc, station) => {
         if (!station.hasEquipment || station.equipment.length === 0) {
-            return [[{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]];
+            acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            station.equipment.forEach((equip, index) => {
+                acc.push([
+                    index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    equip.brand,
+                    equip.kva,
+                    equip.condition,
+                    equip.dependency
+                ]);
+            });
         }
-        return station.equipment.map((equip, index) => [
-            index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
-            equip.brand,
-            equip.kva,
-            equip.condition,
-            equip.dependency
-        ]);
-    });
+        return acc;
+    }, []);
 
     autoTable(doc, {
         head: [['ESTACIÓN', 'MARCA', 'KVA', 'COND.', 'DEPENDENCIA']],

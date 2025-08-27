@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { EraData, EraReportStation, EraEquipment } from '../types';
 import { PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons';
@@ -94,7 +95,7 @@ const EraReportDisplay: React.FC<EraReportDisplayProps> = ({ reportData, onUpdat
         <div className="mb-6 bg-zinc-800/60 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
                 <h2 className="text-3xl font-bold text-white">Trasvazadores de E.R.A.</h2>
-                <p className="text-zinc-400">Fecha del reporte: {reportData.reportDate}</p>
+                <p className="text-zinc-400">Fecha del reporte: {new Date().toLocaleString('es-AR')}</p>
             </div>
              <div className="flex items-center gap-2 self-start sm:self-center">
                  {isEditing ? (

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
@@ -769,10 +770,10 @@ const App = () => {
                         React.createElement("div", { className: "flex items-center mb-4 sm:mb-0" },
                             React.createElement("button", { onClick: handleResetData, className: "mr-2 text-zinc-400 hover:text-white transition-colors", "aria-label": "Reiniciar Datos"}, React.createElement(RefreshIcon, { className: "w-6 h-6" })),
                             React.createElement("button", { onClick: () => setIsHelpModalOpen(true), className: "mr-4 text-zinc-400 hover:text-white transition-colors", "aria-label": "Ayuda"}, React.createElement(QuestionMarkCircleIcon, { className: "w-6 h-6" })),
-                            React.createElement("img", { src: "https://ci.bomberosdelaciudad.gob.ar/img/logo-bomberos-header-blanco.png", alt: "Logo Bomberos de la Ciudad", className: "h-12 mr-4" }),
-                            React.createElement("div", null,
-                                React.createElement("h1", { className: "text-xl sm:text-2xl font-bold tracking-tight" }, "Bomberos de la Ciudad"),
-                                React.createElement("p", { className: "text-xs text-zinc-400" }, "Organizador de Unidades y Guardia")
+                            React.createElement("img", { src: "https://ci.bomberosdelaciudad.gob.ar/LibJs/metroBoostrap2/img/fondo%20neutro.png", alt: "Logo Bomberos de la Ciudad", className: "h-12 mr-3" }),
+                            React.createElement("div", { className: "flex flex-col justify-center" },
+                                React.createElement("h1", { className: "text-xl sm:text-2xl font-bold text-white" }, "Bomberos de la Ciudad"),
+                                React.createElement("p", { className: "text-xs text-zinc-400 -mt-1" }, "Organizador de Unidades y Guardia")
                             )
                         ),
                         React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },

@@ -1,11 +1,9 @@
 
-
-
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData } from '../types';
+import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -194,7 +192,7 @@ export const exportScheduleToWord = (schedule: Schedule) => {
     Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
-export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: { date: string; assignmentsByTime: { [time: string]: Assignment[] }; }) => {
+export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }: { date: string, assignmentsByTime: { [time: string]: Assignment[] } }) => {
     const sortedTimeKeys = Object.keys(assignmentsByTime).sort((a, b) => parseInt(a.split(':')[0], 10) - parseInt(b.split(':')[0], 10));
     const content = sortedTimeKeys.flatMap(time => [
         new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }),
@@ -278,11 +276,11 @@ export const exportScheduleAsExcelTemplate = (schedule: Schedule) => {
 };
 
 export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
-    const createTemplateSection = (services: Service[], title: string) => {
+    const createTemplateSection = (services: Service[], title: string): Paragraph[] => {
         if (!services || services.length === 0) return [];
         
         const sectionContent = services.flatMap(service => {
-            const processAssignment = (assignment?: Assignment) => {
+            const processAssignment = (assignment?: Assignment): Paragraph[] => {
                 const paragraphs = [
                     new Paragraph({ children: [new TextRun({ text: "Título del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.title, ...CONTENT_STYLE })] }),
                     new Paragraph({ children: [new TextRun({ text: "Descripción del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.description || '', ...CONTENT_STYLE })] }),
@@ -335,7 +333,7 @@ export const exportScheduleAsWordTemplate = (schedule: Schedule) => {
     Packer.toBlob(doc).then(blob => saveFile(blob, `plantilla_desde_horario_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
-export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }: { unitList: string[]; commandPersonnel: Personnel[]; servicePersonnel: Personnel[] }) => {
+export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }: { unitList: string[], commandPersonnel: Personnel[], servicePersonnel: Personnel[]}) => {
     const instructions = new Paragraph({
         children: [
             new TextRun({
@@ -474,7 +472,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
             }
         }]);
         
-        zone.groups.forEach(group => {
+        zone.groups.forEach((group: UnitGroup) => {
             allRows.push([{
                 content: group.name,
                 colSpan: 5,
@@ -486,7 +484,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
                 }
             }]);
 
-            group.units.forEach(unit => {
+            group.units.forEach((unit: FireUnit) => {
                 allRows.push([
                     unit.id,
                     unit.type,
@@ -528,7 +526,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
     doc.save(`Reporte_Unidades_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
 };
 
-const createPdfTable = (doc: jsPDF, title: string, head: any[], body: any[][], startY: number) => {
+const createPdfTable = (doc: jsPDF, title: string, head: string[], body: any[][], startY: number) => {
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(title, 14, startY);
@@ -546,7 +544,6 @@ const createPdfTable = (doc: jsPDF, title: string, head: any[], body: any[][], s
 export const exportEraReportToPdf = (reportData: EraData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 14;
     let y = 15;
 
     doc.setFontSize(16);
@@ -559,19 +556,19 @@ export const exportEraReportToPdf = (reportData: EraData) => {
     doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
     y += 10;
 
-// FIX: Replace `flatMap` with `reduce` to fix TypeScript type inference issues.
     const body = reportData.stations.reduce((acc: any[][], station) => {
         if (!station.hasEquipment || station.equipment.length === 0) {
             acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
         } else {
-            const stationRows = station.equipment.map((equip, index) => [
-                index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
-                equip.brand,
-                equip.voltage,
-                equip.condition,
-                equip.dependency
-            ]);
-            acc.push(...stationRows);
+            station.equipment.forEach((equip, index) => {
+                acc.push([
+                    index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    equip.brand,
+                    equip.voltage,
+                    equip.condition,
+                    equip.dependency
+                ]);
+            });
         }
         return acc;
     }, []);
@@ -591,7 +588,6 @@ export const exportEraReportToPdf = (reportData: EraData) => {
 export const exportGeneratorReportToPdf = (reportData: GeneratorData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
-    const margin = 14;
     let y = 15;
 
     doc.setFontSize(16);
@@ -604,19 +600,19 @@ export const exportGeneratorReportToPdf = (reportData: GeneratorData) => {
     doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
     y += 10;
 
-// FIX: Replace `flatMap` with `reduce` to fix TypeScript type inference issues.
     const body = reportData.stations.reduce((acc: any[][], station) => {
         if (!station.hasEquipment || station.equipment.length === 0) {
             acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
         } else {
-            const stationRows = station.equipment.map((equip, index) => [
-                index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
-                equip.brand,
-                equip.kva,
-                equip.condition,
-                equip.dependency
-            ]);
-            acc.push(...stationRows);
+            station.equipment.forEach((equip, index) => {
+                acc.push([
+                    index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    equip.brand,
+                    equip.kva,
+                    equip.condition,
+                    equip.dependency
+                ]);
+            });
         }
         return acc;
     }, []);
@@ -633,7 +629,7 @@ export const exportGeneratorReportToPdf = (reportData: GeneratorData) => {
     doc.save(`Reporte_Grupos_Electrogenos_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
 };
 
-export const exportUnitStatusToPdf = (filteredUnits: any[]) => {
+export const exportUnitStatusToPdf = (filteredUnits: (FireUnit & { groupName: string })[]) => {
     const doc = new jsPDF('landscape');
     let y = 15;
 

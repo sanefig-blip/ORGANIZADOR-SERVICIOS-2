@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -782,10 +783,10 @@ const App: React.FC = () => {
                         <div className="flex items-center mb-4 sm:mb-0">
                             <button onClick={handleResetData} className="mr-2 text-zinc-400 hover:text-white transition-colors" aria-label="Reiniciar Datos"><RefreshIcon className="w-6 h-6" /></button>
                             <button onClick={() => setIsHelpModalOpen(true)} className="mr-4 text-zinc-400 hover:text-white transition-colors" aria-label="Ayuda"><QuestionMarkCircleIcon className="w-6 h-6" /></button>
-                            <img src="https://ci.bomberosdelaciudad.gob.ar/img/logo-bomberos-header-blanco.png" alt="Logo Bomberos de la Ciudad" className="h-12 mr-4" />
-                            <div>
-                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Bomberos de la Ciudad</h1>
-                                <p className="text-xs text-zinc-400">Organizador de Unidades y Guardia</p>
+                            <img src="https://ci.bomberosdelaciudad.gob.ar/LibJs/metroBoostrap2/img/fondo%20neutro.png" alt="Logo Bomberos de la Ciudad" className="h-12 mr-3" />
+                            <div className="flex flex-col justify-center">
+                                <h1 className="text-xl sm:text-2xl font-bold text-white">Bomberos de la Ciudad</h1>
+                                <p className="text-xs text-zinc-400 -mt-1">Organizador de Unidades y Guardia</p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2">

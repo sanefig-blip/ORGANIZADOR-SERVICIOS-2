@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { UnitReportData, Zone, UnitGroup, FireUnit, Personnel, RANKS } from '../types';
 import { ChevronDownIcon, SearchIcon, PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons';
@@ -50,7 +51,8 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
 
   const handleSave = () => {
     if (editableReport) {
-      onUpdateReport(editableReport);
+      const reportWithDate = { ...editableReport, reportDate: new Date().toLocaleString('es-AR') };
+      onUpdateReport(reportWithDate);
     }
     setIsEditing(false);
     setEditableReport(null);
@@ -206,48 +208,42 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
   if (!filteredData) {
       return null;
   }
-
-  const renderOfficerList = (title: string, officers?: string[]) => {
-      if (!officers || officers.length === 0) return null;
-      return (
-          <div className="mt-4 pl-2">
-              <h5 className="font-semibold text-blue-300 mb-1">{title}</h5>
-              <ul className="list-disc list-inside text-zinc-300 space-y-1">
-                  {officers.map((officer, index) => {
-                      let rankPart = '';
-                      let namePart = officer;
-                      for (const rank of sortedRanks) {
-                          if (officer.toUpperCase().startsWith(rank + ' ')) {
-                              rankPart = officer.substring(0, rank.length);
-                              namePart = officer.substring(rank.length).trim();
-                              break;
-                          }
-                      }
-                      return (
-                          <li key={index}>
-                              {rankPart ? (
-                                  <>
-                                      <span className="font-semibold text-yellow-300">{rankPart}</span>
-                                      <span> {namePart}</span>
-                                  </>
-                              ) : (
-                                  namePart
-                              )}
-                          </li>
-                      );
-                  })}
-              </ul>
-          </div>
-      );
-  };
   
-  const renderEditableOfficerList = (
-    title: string,
-    listType: 'crewOfficers' | 'standbyOfficers',
-    officers: string[] | undefined,
-    zoneIdx: number,
-    groupIdx: number
-  ) => {
+  const renderOfficerList = (title: string, officers?: string[]) => {
+    if (!officers || officers.length === 0) return null;
+    return (
+        <div className="mt-4 pl-2">
+            <h5 className="font-semibold text-blue-300 mb-1">{title}</h5>
+            <ul className="list-disc list-inside text-zinc-300 space-y-1">
+                {officers.map((officer, index) => {
+                    let rankPart = '';
+                    let namePart = officer;
+                    for (const rank of sortedRanks) {
+                        if (officer.toUpperCase().startsWith(rank + ' ')) {
+                            rankPart = officer.substring(0, rank.length);
+                            namePart = officer.substring(rank.length).trim();
+                            break;
+                        }
+                    }
+                    return (
+                        <li key={index}>
+                            {rankPart ? (
+                                <>
+                                    <span className="font-semibold text-yellow-300">{rankPart}</span>
+                                    <span> {namePart}</span>
+                                </>
+                            ) : (
+                                namePart
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+  };
+
+    const renderEditableOfficerList = (title: string, listType: 'crewOfficers' | 'standbyOfficers', officers: string[] | undefined, zoneIdx: number, groupIdx: number) => {
     const key = `${zoneIdx}-${groupIdx}-${listType}`;
     const searchTerm = addOfficerInput[key] || '';
     const filteredPersonnel = allPersonnel.filter(p => 
@@ -313,7 +309,6 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
     );
   };
 
-
   return (
     <div className="animate-fade-in">
         <datalist id="personnel-list-for-units">
@@ -328,43 +323,43 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
             <h2 className="text-3xl font-bold text-white">Reporte de Unidades de Bomberos</h2>
-            <p className="text-zinc-400">Fecha del reporte: {reportData.reportDate}</p>
+            <p className="text-zinc-400">Fecha del reporte: {new Date().toLocaleString('es-AR')}</p>
           </div>
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            <div className="relative w-full sm:w-auto min-w-[250px]">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Buscar unidades, personal, etc..."
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full bg-zinc-700/80 border-zinc-600 rounded-md pl-10 pr-4 py-2 text-white placeholder-zinc-400 focus:ring-blue-500 focus:border-blue-500"
-                aria-label="Buscar"
-              />
-            </div>
-             {isEditing ? (
-                <div className="flex items-center gap-2">
-                    <button onClick={handleSave} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2"><PencilIcon className="w-5 h-5"/> Guardar</button>
-                    <button onClick={handleCancel} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"><XCircleIcon className="w-6 h-6"/></button>
-                </div>
-            ) : (
-                <div className="flex items-center gap-2">
-                  <button onClick={() => exportUnitReportToPdf(reportData)} className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2">
-                      <DownloadIcon className="w-5 h-5"/> Exportar PDF
-                  </button>
-                  <button onClick={handleEdit} className="px-3 py-2 bg-zinc-600 hover:bg-zinc-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2">
-                      <PencilIcon className="w-5 h-5"/> Editar
-                  </button>
-                </div>
-            )}
+          <div className="flex items-center gap-4 flex-wrap">
+              <div className="relative w-full sm:w-auto min-w-[250px]">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar unidades, personal, etc..."
+                  value={searchTerm}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full bg-zinc-700/80 border-zinc-600 rounded-md pl-10 pr-4 py-2 text-white placeholder-zinc-400 focus:ring-blue-500 focus:border-blue-500"
+                  aria-label="Buscar"
+                />
+              </div>
+              {isEditing ? (
+                  <div className="flex items-center gap-2">
+                      <button onClick={handleSave} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2"><PencilIcon className="w-5 h-5" /> Guardar</button>
+                      <button onClick={handleCancel} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"><XCircleIcon className="w-6 h-6" /></button>
+                  </div>
+              ) : (
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => exportUnitReportToPdf(reportData)} className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2">
+                        <DownloadIcon className="w-5 h-5" /> Exportar PDF
+                    </button>
+                    <button onClick={handleEdit} className="px-3 py-2 bg-zinc-600 hover:bg-zinc-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2">
+                        <PencilIcon className="w-5 h-5" /> Editar
+                    </button>
+                  </div>
+              )}
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <span className="px-3 py-1 bg-zinc-700 rounded-full text-white">Total: <strong className="font-semibold">{stats.total}</strong></span>
-            <span className={`px-3 py-1 rounded-full ${getStatusColor('para servicio')}`}>En Servicio: <strong className="font-semibold">{stats.inService}</strong></span>
-            <span className={`px-3 py-1 rounded-full ${getStatusColor('fuera de servicio')}`}>Fuera de Servicio: <strong className="font-semibold">{stats.outOfService}</strong></span>
-            <span className={`px-3 py-1 rounded-full ${getStatusColor('reserva')}`}>Reserva: <strong className="font-semibold">{stats.reserve}</strong></span>
-            <span className={`px-3 py-1 rounded-full ${getStatusColor('préstamo')}`}>A Préstamo: <strong className="font-semibold">{stats.onLoan}</strong></span>
+            <span className="px-3 py-1 bg-zinc-700 rounded-full text-white">Total: <strong>{stats.total}</strong></span>
+            <span className={`px-3 py-1 rounded-full ${getStatusColor('para servicio')}`}>En Servicio: <strong>{stats.inService}</strong></span>
+            <span className={`px-3 py-1 rounded-full ${getStatusColor('fuera de servicio')}`}>Fuera de Servicio: <strong>{stats.outOfService}</strong></span>
+            <span className={`px-3 py-1 rounded-full ${getStatusColor('reserva')}`}>Reserva: <strong>{stats.reserve}</strong></span>
+            <span className={`px-3 py-1 rounded-full ${getStatusColor('préstamo')}`}>A Préstamo: <strong>{stats.onLoan}</strong></span>
         </div>
       </div>
       
@@ -437,36 +432,36 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
                                   </td>
                                   <td className="p-2">
                                     {isEditing ? (
-                                      <div className="flex flex-col">
-                                        <select
-                                            value={unit.status}
-                                            onChange={(e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'status', e.target.value)}
-                                            className="w-full bg-zinc-700 border-zinc-600 rounded-md px-2 py-1 text-white"
-                                        >
-                                            <option>Para Servicio</option>
-                                            <option>Fuera de Servicio</option>
-                                            <option>Reserva</option>
-                                            <option>A Préstamo</option>
-                                        </select>
-                                        {unit.status.toLowerCase().includes('fuera de servicio') && (
-                                            <input
-                                                type="text"
-                                                placeholder="Motivo..."
-                                                value={unit.outOfServiceReason || ''}
-                                                onChange={(e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'outOfServiceReason', e.target.value)}
-                                                className="mt-1 w-full bg-zinc-900 border-zinc-700 rounded-md px-2 py-1 text-white text-xs"
-                                            />
-                                        )}
-                                      </div>
+                                        <div className="flex flex-col">
+                                            <select
+                                                value={unit.status}
+                                                onChange={(e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'status', e.target.value)}
+                                                className="w-full bg-zinc-700 border-zinc-600 rounded-md px-2 py-1 text-white"
+                                            >
+                                                <option>Para Servicio</option>
+                                                <option>Fuera de Servicio</option>
+                                                <option>Reserva</option>
+                                                <option>A Préstamo</option>
+                                            </select>
+                                            {unit.status.toLowerCase().includes('fuera de servicio') && (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Motivo..."
+                                                    value={unit.outOfServiceReason || ''}
+                                                    onChange={(e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'outOfServiceReason', e.target.value)}
+                                                    className="mt-1 w-full bg-zinc-900 border-zinc-700 rounded-md px-2 py-1 text-white text-xs"
+                                                />
+                                            )}
+                                        </div>
                                     ) : (
-                                      <>
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(unit.status)}`}>
-                                            {unit.status}
-                                        </span>
-                                        {unit.status.toLowerCase().includes('fuera de servicio') && unit.outOfServiceReason && (
-                                            <div className="text-xs text-red-400 italic mt-1">{unit.outOfServiceReason}</div>
-                                        )}
-                                      </>
+                                        <>
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(unit.status)}`}>
+                                                {unit.status}
+                                            </span>
+                                            {unit.status.toLowerCase().includes('fuera de servicio') && unit.outOfServiceReason && (
+                                                <div className="text-xs text-red-400 italic mt-1">{unit.outOfServiceReason}</div>
+                                            )}
+                                        </>
                                     )}
                                   </td>
                                   <td className="p-2 text-zinc-300">

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { ChevronDownIcon, SearchIcon, PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons.js';
 import { exportUnitReportToPdf } from '../services/exportService.js';
@@ -39,7 +40,8 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
 
   const handleSave = () => {
     if (editableReport) {
-      onUpdateReport(editableReport);
+      const reportWithDate = { ...editableReport, reportDate: new Date().toLocaleString('es-AR') };
+      onUpdateReport(reportWithDate);
     }
     setIsEditing(false);
     setEditableReport(null);
@@ -311,43 +313,43 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
         React.createElement("div", { className: "flex flex-col sm:flex-row justify-between items-start gap-4" },
           React.createElement("div", null,
             React.createElement("h2", { className: "text-3xl font-bold text-white" }, "Reporte de Unidades de Bomberos"),
-            React.createElement("p", { className: "text-zinc-400" }, "Fecha del reporte: ", reportData.reportDate)
+            React.createElement("p", { className: "text-zinc-400" }, "Fecha del reporte: ", new Date().toLocaleString('es-AR'))
           ),
-          React.createElement("div", { className: "flex items-center gap-2 self-start sm:self-center" },
-            React.createElement("div", { className: "relative w-full sm:w-auto min-w-[250px]" },
-              React.createElement(SearchIcon, { className: "absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" }),
-              React.createElement("input", {
-                type: "text",
-                placeholder: "Buscar unidades, personal, etc...",
-                value: searchTerm,
-                onChange: (e) => onSearchChange(e.target.value),
-                className: "w-full bg-zinc-700/80 border-zinc-600 rounded-md pl-10 pr-4 py-2 text-white placeholder-zinc-400 focus:ring-blue-500 focus:border-blue-500",
-                "aria-label": "Buscar"
-              })
-            ),
-             isEditing ? (
-                React.createElement("div", { className: "flex items-center gap-2" },
-                    React.createElement("button", { onClick: handleSave, className: "px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" }, React.createElement(PencilIcon, { className: "w-5 h-5" }), " Guardar"),
-                    React.createElement("button", { onClick: handleCancel, className: "p-2 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors" }, React.createElement(XCircleIcon, { className: "w-6 h-6" }))
-                )
-            ) : (
-                React.createElement("div", { className: "flex items-center gap-2" },
-                  React.createElement("button", { onClick: () => exportUnitReportToPdf(reportData), className: "px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" },
-                      React.createElement(DownloadIcon, { className: "w-5 h-5" }), " Exportar PDF"
-                  ),
-                  React.createElement("button", { onClick: handleEdit, className: "px-3 py-2 bg-zinc-600 hover:bg-zinc-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" },
-                      React.createElement(PencilIcon, { className: "w-5 h-5" }), " Editar"
+          React.createElement("div", { className: "flex items-center gap-4 flex-wrap" },
+              React.createElement("div", { className: "relative w-full sm:w-auto min-w-[250px]" },
+                React.createElement(SearchIcon, { className: "absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" }),
+                React.createElement("input", {
+                  type: "text",
+                  placeholder: "Buscar unidades, personal, etc...",
+                  value: searchTerm,
+                  onChange: (e) => onSearchChange(e.target.value),
+                  className: "w-full bg-zinc-700/80 border-zinc-600 rounded-md pl-10 pr-4 py-2 text-white placeholder-zinc-400 focus:ring-blue-500 focus:border-blue-500",
+                  "aria-label": "Buscar"
+                })
+              ),
+              isEditing ? (
+                  React.createElement("div", { className: "flex items-center gap-2" },
+                      React.createElement("button", { onClick: handleSave, className: "px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" }, React.createElement(PencilIcon, { className: "w-5 h-5" }), " Guardar"),
+                      React.createElement("button", { onClick: handleCancel, className: "p-2 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors" }, React.createElement(XCircleIcon, { className: "w-6 h-6" }))
                   )
-                )
-            )
+              ) : (
+                  React.createElement("div", { className: "flex items-center gap-2" },
+                    React.createElement("button", { onClick: () => exportUnitReportToPdf(reportData), className: "px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" },
+                        React.createElement(DownloadIcon, { className: "w-5 h-5" }), " Exportar PDF"
+                    ),
+                    React.createElement("button", { onClick: handleEdit, className: "px-3 py-2 bg-zinc-600 hover:bg-zinc-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2" },
+                        React.createElement(PencilIcon, { className: "w-5 h-5" }), " Editar"
+                    )
+                  )
+              )
           )
         ),
         React.createElement("div", { className: "mt-4 flex flex-wrap gap-2 text-sm" },
-            React.createElement("span", { className: "px-3 py-1 bg-zinc-700 rounded-full text-white" }, "Total: ", React.createElement("strong", { className: "font-semibold" }, stats.total)),
-            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('para servicio')}` }, "En Servicio: ", React.createElement("strong", { className: "font-semibold" }, stats.inService)),
-            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('fuera de servicio')}` }, "Fuera de Servicio: ", React.createElement("strong", { className: "font-semibold" }, stats.outOfService)),
-            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('reserva')}` }, "Reserva: ", React.createElement("strong", { className: "font-semibold" }, stats.reserve)),
-            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('préstamo')}` }, "A Préstamo: ", React.createElement("strong", { className: "font-semibold" }, stats.onLoan))
+            React.createElement("span", { className: "px-3 py-1 bg-zinc-700 rounded-full text-white" }, "Total: ", React.createElement("strong", {className:"font-semibold"}, stats.total)),
+            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('para servicio')}` }, "En Servicio: ", React.createElement("strong", {className:"font-semibold"}, stats.inService)),
+            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('fuera de servicio')}` }, "Fuera de Servicio: ", React.createElement("strong", {className:"font-semibold"}, stats.outOfService)),
+            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('reserva')}` }, "Reserva: ", React.createElement("strong", {className:"font-semibold"}, stats.reserve)),
+            React.createElement("span", { className: `px-3 py-1 rounded-full ${getStatusColor('préstamo')}` }, "A Préstamo: ", React.createElement("strong", {className:"font-semibold"}, stats.onLoan))
         )
       ),
       
