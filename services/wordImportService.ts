@@ -1,8 +1,7 @@
 
-
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
-import { Service, Assignment, Schedule, Officer, Rank } from '../types';
+import { Service, Assignment, Schedule, Officer, Rank, FireUnit } from '../types';
 
 const MONTH_NAMES: { [key: string]: number } = { "ENERO": 0, "FEBRERO": 1, "MARZO": 2, "ABRIL": 3, "MAYO": 4, "JUNIO": 5, "JULIO": 6, "AGOSTO": 7, "SEPTIEMBRE": 8, "OCTUBRE": 9, "NOVIEMBRE": 10, "DICIEMBRE": 11 };
 
@@ -114,6 +113,81 @@ function parseTemplateExcel(sheet: XLSX.WorkSheet): Partial<Schedule> {
     };
 }
 
+export const parseUnitReportFromExcel = (fileBuffer: ArrayBuffer): { stationName: string; units: FireUnit[] } | null => {
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+
+    if (rows.length < 5) return null;
+
+    let stationName: string | null = null;
+    const stationNameCell = rows[3]?.[4] || ''; // E4
+    
+    // Match "ESTACION X 'LUGANO'" or "ESTACION X LUGANO"
+    const stationNameMatch = stationNameCell.match(/ESTACION\s+[IVXLCDM]+\s*(?:['"]?)([^'"]+)(?:['"]?)/i);
+
+    if (stationNameMatch && stationNameMatch[1]) {
+        const numberMatch = stationNameCell.match(/ESTACION\s+([IVXLCDM]+)/i);
+        const stationNumber = numberMatch ? `${numberMatch[1]} ` : '';
+        const extractedName = stationNameMatch[1].trim();
+        // Reconstruct the full name as used in the app data
+        stationName = `ESTACIÓN ${stationNumber}${extractedName}`.trim();
+    }
+    
+    if (!stationName) {
+        console.error("Could not find station name in cell E4");
+        return null;
+    }
+
+    const headerRowIndex = rows.findIndex(row => row && row[0] === 'UNIDADES');
+    if (headerRowIndex === -1) {
+         console.error("Could not find header row with 'UNIDADES'");
+        return null;
+    }
+
+    const headers = rows[headerRowIndex].map(h => String(h || '').trim());
+    const unitsData = rows.slice(headerRowIndex + 1);
+
+    const units: FireUnit[] = [];
+
+    const col = (header: string) => headers.indexOf(header);
+
+    for (const row of unitsData) {
+        if (!row[col('UNIDADES')] || String(row[col('UNIDADES')]).trim() === 'TOTALES') break;
+        
+        const cond = String(row[col('COND')] || '').trim().toUpperCase();
+        const dep = String(row[col('DEP')] || '').trim();
+
+        let status = 'Estado Desconocido';
+        let outOfServiceReason = undefined;
+
+        if (cond === 'P/S') status = 'Para Servicio';
+        else if (cond === 'F/S') status = 'Fuera de Servicio';
+        else if (cond === 'RES') status = 'Reserva';
+        
+        if (dep.toLowerCase().includes('préstamo')) {
+            status = 'A Préstamo';
+        }
+
+        if (status === 'Fuera de Servicio' && dep && !dep.toLowerCase().includes('en dependencia')) {
+             outOfServiceReason = dep;
+        }
+
+        const unit: FireUnit = {
+            id: String(row[col('UNIDADES')] || '').trim(),
+            type: String(row[col('TIPO')] || '').trim(),
+            internalId: String(row[col('INT')] || '').trim(),
+            status: status,
+            outOfServiceReason: outOfServiceReason,
+            officerInCharge: String(row[col('A CARGO')] || '').trim() || undefined,
+            personnelCount: parseInt(row[col('DOT')], 10) || null,
+        };
+        units.push(unit);
+    }
+
+    return { stationName, units };
+};
 
 const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
     const schedule: Partial<Schedule> = { commandStaff: [], services: [], sportsEvents: [] };
@@ -228,108 +302,47 @@ const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
         }
 
         const nextLine = (lines[i + 1] || '').trim().toUpperCase();
-        if (line === line.toUpperCase() && line.length > 8 && !line.match(/^(\d+)\s*[-–]/) && nextLine.startsWith('HORARIO:')) {
+        if (line === line.toUpperCase() && line.length > 8 && !line.match(/^(Bombero|Oficial|Subteniente|Inspector|Teniente|JEFE DE|POR ORDEN)/i) && !nextLine.startsWith('HORARIO')) {
             commitAssignment();
             currentAssignment.location = line.replace(/[.-]$/, '').trim();
             continue;
         }
-
-        if (line.length > 0) {
-             if (line.match(/^(La misma|MISION|Personal deberá|Por orden superior)/i)) {
-                 if (currentAssignment.location || (currentAssignment.details && currentAssignment.details.length > 0)) {
-                    commitAssignment();
-                 }
-                currentService.novelty = ((currentService.novelty || '') + ' ' + line).trim();
-             } else {
-                if (!currentAssignment.details) currentAssignment.details = [];
-                currentAssignment.details.push(line);
-             }
-        }
-    }
-    commitAssignment();
-    
-    return (schedule.services!.length > 0 || schedule.sportsEvents!.length > 0 || schedule.commandStaff!.length > 0) ? schedule : null;
-};
-
-const parseSimpleTemplate = (lines: string[]): Partial<Schedule> => {
-    const services: Service[] = [];
-    let currentService: Service | null = null;
-    let currentAssignment: Partial<Assignment> & { tempDetails?: string[] } = {};
-
-    const commitAssignment = () => {
-        if (currentService && currentAssignment.location && currentAssignment.time && currentAssignment.personnel) {
-            currentService.assignments.push({
-                id: `imported-assign-${Date.now()}-${Math.random()}`,
-                location: currentAssignment.location, time: currentAssignment.time, personnel: currentAssignment.personnel,
-                implementationTime: currentAssignment.implementationTime, unit: currentAssignment.unit,
-                details: currentAssignment.tempDetails,
-            } as Assignment);
-        }
-        currentAssignment = {};
-    };
-
-    lines.forEach(line => {
-        const parts = line.split(/:(.*)/s);
-        if (parts.length < 2) {
-            if (currentAssignment.location) {
-                if (!currentAssignment.tempDetails) currentAssignment.tempDetails = [];
-                currentAssignment.tempDetails.push(line.trim());
-            }
-            return;
-        }
-        const key = parts[0].trim(), value = parts[1].trim();
-
-        if (key === 'Título del Servicio') {
-            commitAssignment();
-            currentService = {
-                id: `imported-word-service-${Date.now()}-${services.length}`,
-                title: value,
-                assignments: [],
-                isHidden: false,
-            };
-            services.push(currentService);
-        } else if (currentService) {
-            switch (key) {
-                case 'Descripción del Servicio': currentService.description = value; break;
-                case 'Novedad del Servicio': currentService.novelty = value; break;
-                case 'Ubicación de Asignación': commitAssignment(); currentAssignment.location = value; break;
-                case 'Horario de Asignación': currentAssignment.time = value; break;
-                case 'Personal de Asignación': currentAssignment.personnel = value; break;
-                case 'Unidad de Asignación': currentAssignment.unit = value; break;
-                case 'Detalles de Asignación':
-                    if (!currentAssignment.tempDetails) currentAssignment.tempDetails = [];
-                    const allDetails = value.split(/;|\n/g).map(d => d.trim()).filter(Boolean);
-                    const implTime = allDetails.find(d => d.toUpperCase().startsWith('HORARIO DE IMPLANTACION'));
-                    if (implTime) currentAssignment.implementationTime = implTime;
-                    currentAssignment.tempDetails.push(...allDetails.filter(d => !d.toUpperCase().startsWith('HORARIO DE IMPLANTACION')));
-                    break;
-            }
-        }
-    });
-    commitAssignment();
-
-    return {
-        services: services.filter(s => !s.title.toUpperCase().includes('EVENTO DEPORTIVO')),
-        sportsEvents: services.filter(s => s.title.toUpperCase().includes('EVENTO DEPORTIVO')),
-    };
-};
-
-export const parseScheduleFromFile = async (fileBuffer: ArrayBuffer, fileName: string): Promise<Partial<Schedule>> => {
-    const fileExtension = fileName.split('.').pop()?.toLowerCase();
-
-    if (fileExtension === 'docx') {
-        const { value: text } = await mammoth.extractRawText({ arrayBuffer: fileBuffer });
-        const lines = text.split('\n').map(l => l.trim().replace(/\u2013|\u2014/g, "-")).filter(Boolean);
-        return parseFullSchedule(lines) || parseSimpleTemplate(lines);
-    } 
-    
-    if (['xlsx', 'xls', 'ods'].includes(fileExtension!)) {
-        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
         
-        return parsePersonnelExcel(sheet) || parseTemplateExcel(sheet);
+        if (line) {
+            if (!currentAssignment.details) {
+                currentAssignment.details = [];
+            }
+            currentAssignment.details.push(line);
+        }
     }
+    commitAssignment();
+    return schedule;
+};
 
-    return {};
+async function parseWordFile(fileBuffer: ArrayBuffer): Promise<string[]> {
+    const result = await mammoth.extractRawText({ arrayBuffer: fileBuffer });
+    return result.value.split('\n').filter(line => line.trim() !== '');
+}
+
+async function parseExcelFile(fileBuffer: ArrayBuffer): Promise<Partial<Schedule> | null> {
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    
+    // Detect format
+    const firstCell = sheet['A1'] ? sheet['A1'].v : '';
+    if (firstCell.toUpperCase().includes('GUARDIA DEL DIA')) {
+        return parsePersonnelExcel(sheet);
+    }
+    return parseTemplateExcel(sheet);
+}
+
+export const parseScheduleFromFile = async (fileBuffer: ArrayBuffer, fileName: string): Promise<Partial<Schedule> | null> => {
+    if (fileName.endsWith('.docx')) {
+        const lines = await parseWordFile(fileBuffer);
+        return parseFullSchedule(lines);
+    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.ods')) {
+        return parseExcelFile(fileBuffer);
+    }
+    return null;
 };

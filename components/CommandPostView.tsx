@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { UnitReportData, SCI201Data, SCI211Resource, SCI207Victim, TriageCategory } from '../types';
-import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon } from './icons';
+import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon, DownloadIcon } from './icons';
+import { exportCommandPostToPdf } from '../services/exportService';
 
 interface TrackedUnit {
   id: string;
@@ -202,10 +204,16 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
                     <AnnotationIcon className="w-8 h-8 text-yellow-300"/>
                     <h2 className="text-2xl lg:text-3xl font-bold text-white">Puesto de Comando - Control de Intervención</h2>
                 </div>
-                <button onClick={handleReset} className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors">
-                    <RefreshIcon className="w-5 h-5"/>
-                    Limpiar Hoja
-                </button>
+                 <div className="flex-shrink-0 flex items-center gap-2">
+                    <button onClick={() => exportCommandPostToPdf(incidentDetails, trackedUnits, trackedPersonnel)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-md transition-colors">
+                        <DownloadIcon className="w-5 h-5"/>
+                        Generar Reporte
+                    </button>
+                    <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors">
+                        <RefreshIcon className="w-5 h-5"/>
+                        Limpiar Hoja
+                    </button>
+                </div>
             </div>
 
             <div className="bg-zinc-800/60 p-2 rounded-xl">

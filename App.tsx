@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -9,8 +10,8 @@ import { commandPersonnelData as defaultCommandPersonnel } from './data/commandP
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.ts';
 import { defaultUnits } from './data/unitData.ts';
 import { defaultServiceTemplates } from './data/serviceTemplates.ts';
-import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate, exportExcelTemplate, exportWordTemplate } from './services/exportService.ts';
-import { parseScheduleFromFile } from './services/wordImportService.ts';
+import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.ts';
+import { parseScheduleFromFile, parseUnitReportFromExcel } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
@@ -58,12 +59,13 @@ const App: React.FC = () => {
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
     const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-    const [templateModalProps, setTemplateModalProps] = useState({});
+    const [templateModalProps, setTemplateModalProps] = useState<any>({});
     const [isExportTemplateModalOpen, setIsExportTemplateModalOpen] = useState(false);
     const [isImportMenuOpen, setImportMenuOpen] = useState(false);
     const [isExportMenuOpen, setExportMenuOpen] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const unitReportFileInputRef = useRef<HTMLInputElement>(null);
     const rosterInputRef = useRef<HTMLInputElement>(null);
     const importMenuRef = useRef<HTMLDivElement>(null);
     const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -194,8 +196,8 @@ const App: React.FC = () => {
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
 
         const nomencladorUnits: string[] = JSON.parse(localStorage.getItem('unitList') || JSON.stringify(defaultUnits));
-        const reportUnits: string[] = unitReportToLoad.zones.flatMap(zone =>
-            zone.groups.flatMap(group => group.units.map(unit => unit.id))
+        const reportUnits: string[] = unitReportToLoad.zones.flatMap((zone: any) =>
+            zone.groups.flatMap((group: any) => group.units.map((unit: any) => unit.id))
         );
         const combinedUnits = [...new Set([...nomencladorUnits, ...reportUnits])];
         combinedUnits.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
@@ -554,6 +556,45 @@ const App: React.FC = () => {
         }
     };
 
+    const handleUnitReportImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !unitReport) return;
+        try {
+            const fileBuffer = await file.arrayBuffer();
+            const importedData = parseUnitReportFromExcel(fileBuffer);
+
+            if (importedData) {
+                const { stationName, units } = importedData;
+                
+                const reportCopy = JSON.parse(JSON.stringify(unitReport));
+                let stationUpdated = false;
+
+                for (const zone of reportCopy.zones) {
+                    const group = zone.groups.find((g: any) => g.name.toUpperCase() === stationName.toUpperCase());
+                    if (group) {
+                        group.units = units;
+                        stationUpdated = true;
+                        break;
+                    }
+                }
+                
+                if (stationUpdated) {
+                    handleUpdateUnitReport(reportCopy);
+                    showToast(`Reporte de unidades para "${stationName}" importado con éxito.`);
+                } else {
+                    alert(`No se encontró la estación "${stationName}" en el reporte actual.`);
+                }
+            } else {
+                alert("No se pudo procesar el archivo Excel. Verifique el formato.");
+            }
+        } catch (error) {
+            console.error("Error al importar el reporte de unidades:", error);
+            alert("Hubo un error al procesar el archivo Excel.");
+        } finally {
+            if (unitReportFileInputRef.current) unitReportFileInputRef.current.value = '';
+        }
+    };
+
     const handleRosterImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -733,6 +774,7 @@ const App: React.FC = () => {
     return (
         <div className="bg-zinc-900 text-white min-h-screen font-sans">
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx,.ods" />
+            <input type="file" ref={unitReportFileInputRef} onChange={handleUnitReportImport} style={{ display: 'none' }} accept=".xlsx,.xls" />
             <input type="file" ref={rosterInputRef} onChange={handleRosterImport} style={{ display: 'none' }} accept=".json" />
             <header className="bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -763,10 +805,13 @@ const App: React.FC = () => {
                                     <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
                                 {isImportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
+                                    <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
                                         <div className="py-1" role="menu" aria-orientation="vertical">
                                             <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
                                                 <UploadIcon className={'w-4 h-4'} /> Importar Horario (Word/Excel)
+                                            </a>
+                                            <a href="#" onClick={(e) => { e.preventDefault(); unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
+                                                <UploadIcon className={'w-4 h-4'} /> Importar Reporte Unidades (Excel)
                                             </a>
                                             <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
                                                 <UploadIcon className={'w-4 h-4'} /> Importar Rol de Guardia (.json)
@@ -812,7 +857,7 @@ const App: React.FC = () => {
             </main>
             {isHelpModalOpen && <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} unitList={unitList} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} />}
             {isRosterModalOpen && <RosterImportModal isOpen={isRosterModalOpen} onClose={() => setIsRosterModalOpen(false)} onConfirm={() => rosterInputRef.current?.click()} />}
-            {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps as any)} onDeleteTemplate={handleDeleteTemplate} />}
+            {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps)} onDeleteTemplate={handleDeleteTemplate} />}
             {isExportTemplateModalOpen && <ExportTemplateModal isOpen={isExportTemplateModalOpen} onClose={() => setIsExportTemplateModalOpen(false)} onExport={handleExportAsTemplate} />}
         </div>
     );

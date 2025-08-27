@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { EraData, EraReportStation, EraEquipment } from '../types';
-import { PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon } from './icons';
+import { PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons';
+import { exportEraReportToPdf } from '../services/exportService';
 
 interface EraReportDisplayProps {
   reportData: EraData;
@@ -101,7 +103,12 @@ const EraReportDisplay: React.FC<EraReportDisplayProps> = ({ reportData, onUpdat
                         <button onClick={handleCancel} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors"><XCircleIcon className="w-6 h-6"/></button>
                     </div>
                 ) : (
+                    <>
+                    <button onClick={() => exportEraReportToPdf(reportData)} className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2">
+                        <DownloadIcon className="w-5 h-5"/> Exportar PDF
+                    </button>
                     <button onClick={handleEdit} className="px-3 py-2 bg-zinc-600 hover:bg-zinc-500 rounded-md text-white font-semibold transition-colors flex items-center gap-2"><PencilIcon className="w-5 h-5"/> Editar</button>
+                    </>
                 )}
              </div>
         </div>
@@ -120,6 +127,23 @@ const EraReportDisplay: React.FC<EraReportDisplayProps> = ({ reportData, onUpdat
                 </thead>
                 <tbody>
                     {data.stations.map((station, stationIdx) => {
+                        if (isEditing && station.hasEquipment && station.equipment.length === 0) {
+                            return (
+                                <tr key={station.name} className="border-t border-zinc-700">
+                                    <td className="p-3 font-semibold text-yellow-300 align-top">
+                                        <div className="flex items-center gap-2">
+                                            <input type="checkbox" checked={station.hasEquipment} onChange={(e) => handleStationChange(stationIdx, 'hasEquipment', e.target.checked)} className="h-4 w-4 bg-zinc-600 border-zinc-500 rounded text-blue-500 focus:ring-blue-500"/>
+                                            <span>{station.name}</span>
+                                        </div>
+                                    </td>
+                                    <td colSpan={4}>
+                                        <button onClick={() => handleAddEquipment(stationIdx)} className="flex items-center gap-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded text-white"><PlusCircleIcon className="w-4 h-4" /> Añadir</button>
+                                    </td>
+                                    <td/>
+                                </tr>
+                            );
+                        }
+                        
                         if (!station.hasEquipment) {
                             return (
                                 <tr key={station.name} className="border-t border-zinc-700">
@@ -139,17 +163,7 @@ const EraReportDisplay: React.FC<EraReportDisplayProps> = ({ reportData, onUpdat
                         if (station.equipment.length === 0) {
                             return (
                                 <tr key={station.name} className="border-t border-zinc-700">
-                                    <td className="p-3 font-semibold text-yellow-300 align-top">
-                                        {isEditing ? (
-                                            <div className="flex flex-col items-start gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <input type="checkbox" checked={station.hasEquipment} onChange={(e) => handleStationChange(stationIdx, 'hasEquipment', e.target.checked)} className="h-4 w-4 bg-zinc-600 border-zinc-500 rounded text-blue-500 focus:ring-blue-500"/>
-                                                    <span>{station.name}</span>
-                                                </div>
-                                                <button onClick={() => handleAddEquipment(stationIdx)} className="flex items-center gap-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded text-white"><PlusCircleIcon className="w-4 h-4" /> Añadir</button>
-                                            </div>
-                                        ) : station.name}
-                                    </td>
+                                    <td className="p-3 font-semibold text-yellow-300 align-top">{station.name}</td>
                                     <td colSpan={isEditing ? 5 : 4} className="p-3 text-center text-zinc-500 italic">No hay equipos para esta estación.</td>
                                 </tr>
                             );

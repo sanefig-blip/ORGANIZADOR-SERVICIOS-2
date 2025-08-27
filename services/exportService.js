@@ -1,3 +1,4 @@
+
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -192,7 +193,10 @@ export const exportScheduleToWord = (schedule) => {
 
 export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }) => {
     const sortedTimeKeys = Object.keys(assignmentsByTime).sort((a, b) => parseInt(a.split(':')[0], 10) - parseInt(b.split(':')[0], 10));
-    const content = sortedTimeKeys.flatMap(time => [ new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }), ...assignmentsByTime[time].flatMap(assignment => createAssignmentParagraphs(assignment, true))]);
+    const content = sortedTimeKeys.flatMap(time => [
+        new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }),
+        ...assignmentsByTime[time].flatMap(assignment => createAssignmentParagraphs(assignment, true))
+    ]);
 
     const doc = new Document({
         creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
@@ -212,6 +216,7 @@ export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }) => {
     Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_por_Hora_${date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
+
 export const exportExcelTemplate = () => {
     const headers = ["Título del Servicio", "Descripción del Servicio", "Novedad del Servicio", "Ubicación de Asignación", "Horario de Asignación", "Horario de Implantación", "Personal de Asignación", "Unidad de Asignación", "Detalles de Asignación"];
     const exampleRow = ["EVENTOS DEPORTIVOS", "O.S. 1234/25", "Presentarse con uniforme de gala.", "Estadio Monumental", "18:00 Hs. a terminar.-", "16:00 Hs.", "Personal a designar", "FZ-1234", "Encuentro Futbolístico 'EQUIPO A VS. EQUIPO B'"];
@@ -222,16 +227,34 @@ export const exportExcelTemplate = () => {
     saveFile(excelBuffer, 'plantilla_servicios.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };
 
+
 export const exportScheduleAsExcelTemplate = (schedule) => {
     const createSheetData = (services) => {
       if (!services || services.length === 0) return [];
       const data = [];
       services.forEach(service => {
-        if (service.assignments.length === 0) data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '' });
-        else service.assignments.forEach(assignment => {
-            const allDetails = assignment.details ? [...assignment.details] : [];
-            data.push({ "Título del Servicio": service.title, "Descripción del Servicio": service.description || '', "Novedad del Servicio": service.novelty || '', "Ubicación de Asignación": assignment.location, "Horario de Asignación": assignment.time, "Horario de Implantación": assignment.implementationTime || '', "Personal de Asignación": assignment.personnel, "Unidad de Asignación": assignment.unit || '', "Detalles de Asignación": allDetails.join('; ') });
-        });
+        if (service.assignments.length === 0) {
+            data.push({
+                "Título del Servicio": service.title,
+                "Descripción del Servicio": service.description || '',
+                "Novedad del Servicio": service.novelty || ''
+            });
+        } else {
+            service.assignments.forEach(assignment => {
+                const allDetails = assignment.details ? [...assignment.details] : [];
+                data.push({
+                    "Título del Servicio": service.title,
+                    "Descripción del Servicio": service.description || '',
+                    "Novedad del Servicio": service.novelty || '',
+                    "Ubicación de Asignación": assignment.location,
+                    "Horario de Asignación": assignment.time,
+                    "Horario de Implantación": assignment.implementationTime || '',
+                    "Personal de Asignación": assignment.personnel,
+                    "Unidad de Asignación": assignment.unit || '',
+                    "Detalles de Asignación": allDetails.join('; ')
+                });
+            });
+        }
       });
       return data;
     };
@@ -240,8 +263,12 @@ export const exportScheduleAsExcelTemplate = (schedule) => {
     const sportsEventsData = createSheetData(schedule.sportsEvents);
     
     const workbook = XLSX.utils.book_new();
-    if (commonServicesData.length > 0) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(commonServicesData), 'Servicios Comunes');
-    if (sportsEventsData.length > 0) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sportsEventsData), 'Eventos Deportivos');
+    if (commonServicesData.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(commonServicesData), 'Servicios Comunes');
+    }
+    if (sportsEventsData.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sportsEventsData), 'Eventos Deportivos');
+    }
     
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     saveFile(excelBuffer, `plantilla_desde_horario_${schedule.date.replace(/\s/g, '_')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -277,7 +304,9 @@ export const exportScheduleAsWordTemplate = (schedule) => {
             return service.assignments.length === 0 ? processAssignment() : service.assignments.flatMap(processAssignment);
         });
 
-        if (sectionContent.length > 0) sectionContent[sectionContent.length - 1] = new Paragraph({ text: "" }); // Remove last separator
+        if (sectionContent.length > 0) {
+            sectionContent[sectionContent.length - 1] = new Paragraph({ text: "" }); // Remove last separator
+        }
         
         return [new Paragraph({ text: title, style: "Heading1" }), ...sectionContent];
     };
@@ -288,7 +317,11 @@ export const exportScheduleAsWordTemplate = (schedule) => {
     const doc = new Document({
         creator: "Servicios del Cuerpo de Bomberos de la Ciudad",
         title: `Plantilla desde Horario - ${schedule.date}`,
-        styles: { paragraphStyles: [ { id: "Heading1", name: "Heading 1", run: { size: 32, bold: true, font: "Arial" }, paragraph: { spacing: { before: 240, after: 240 }, alignment: AlignmentType.CENTER } }] },
+        styles: {
+            paragraphStyles: [
+                { id: "Heading1", name: "Heading 1", run: { size: 32, bold: true, font: "Arial" }, paragraph: { spacing: { before: 240, after: 240 }, alignment: AlignmentType.CENTER } }
+            ]
+        },
         sections: [{ children: [
             ...commonServicesSection,
             ...(sportsEventsSection.length > 0 && commonServicesSection.length > 0 ? [new Paragraph({ children: [new PageBreak()] })] : []),
@@ -392,18 +425,23 @@ export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonne
 
 export const exportRosterTemplate = () => {
     const template = {
-        "2025-08-01": { "jefeInspecciones": "APELLIDO, Nombre", "jefeServicio": "APELLIDO, Nombre", "jefeGuardia": "APELLIDO, Nombre", "jefeReserva": "APELLIDO, Nombre" },
-        "2025-08-02": { "jefeServicio": "OTRO APELLIDO, Nombre" }
+        "2025-08-01": {
+            "jefeInspecciones": "APELLIDO, Nombre",
+            "jefeServicio": "APELLIDO, Nombre",
+            "jefeGuardia": "APELLIDO, Nombre",
+            "jefeReserva": "APELLIDO, Nombre"
+        },
+        "2025-08-02": {
+            "jefeServicio": "OTRO APELLIDO, Nombre"
+        }
     };
     saveFile(JSON.stringify(template, null, 2), 'plantilla_rol_de_guardia.json', 'application/json');
 };
 
 export const exportUnitReportToPdf = (reportData) => {
     const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
     const margin = 14;
-    let y = 0; // y position is managed by autoTable
 
     const drawPageHeader = () => {
         doc.setFontSize(16);
@@ -417,8 +455,6 @@ export const exportUnitReportToPdf = (reportData) => {
         const reportDateTime = reportData.reportDate || new Date().toLocaleString('es-AR');
         doc.text(reportDateTime, pageWidth - margin, 15, { align: 'right' });
     };
-
-    drawPageHeader(); // Draw header on the first page
 
     const allRows = [];
     
@@ -447,7 +483,6 @@ export const exportUnitReportToPdf = (reportData) => {
                 }
             }]);
 
-            // Add table data for the group
             group.units.forEach(unit => {
                 allRows.push([
                     unit.id,
@@ -483,11 +518,197 @@ export const exportUnitReportToPdf = (reportData) => {
             4: { cellWidth: 15, halign: 'center' },
         },
         didDrawPage: (data) => {
-            if (data.pageNumber > 1) {
-                drawPageHeader();
-            }
+            drawPageHeader();
         }
     });
 
     doc.save(`Reporte_Unidades_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+const createPdfTable = (doc, title, head, body, startY) => {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 14, startY);
+    autoTable(doc, {
+        head: [head],
+        body: body,
+        startY: startY + 6,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' }, // zinc-700
+        styles: { fontSize: 8 }
+    });
+    return doc.lastAutoTable.finalY + 10;
+};
+
+export const exportEraReportToPdf = (reportData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Trasvazadores E.R.A.", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    const body = reportData.stations.flatMap(station => {
+        if (!station.hasEquipment || station.equipment.length === 0) {
+            return [[{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]];
+        }
+        return station.equipment.map((equip, index) => [
+            index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+            equip.brand,
+            equip.voltage,
+            equip.condition,
+            equip.dependency
+        ]);
+    });
+
+    autoTable(doc, {
+        head: [['ESTACIÓN', 'MARCA', 'VOLTAJE', 'COND.', 'DEPENDENCIA']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_ERA_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+export const exportGeneratorReportToPdf = (reportData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Grupos Electrógenos", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    const body = reportData.stations.flatMap(station => {
+        if (!station.hasEquipment || station.equipment.length === 0) {
+            return [[{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]];
+        }
+        return station.equipment.map((equip, index) => [
+            index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+            equip.brand,
+            equip.kva,
+            equip.condition,
+            equip.dependency
+        ]);
+    });
+
+    autoTable(doc, {
+        head: [['ESTACIÓN', 'MARCA', 'KVA', 'COND.', 'DEPENDENCIA']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_Grupos_Electrogenos_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+export const exportUnitStatusToPdf = (filteredUnits) => {
+    const doc = new jsPDF('landscape');
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Estado de Unidades Filtradas", 14, y);
+    y += 10;
+
+    autoTable(doc, {
+        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'Personal', 'Ubicación']],
+        body: filteredUnits.map(u => [
+            u.id, u.type, u.status, u.officerInCharge || '-', u.personnelCount ?? '-', u.groupName
+        ]),
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 8 }
+    });
+
+    doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
+};
+
+export const exportCommandPostToPdf = (incidentDetails, trackedUnits, trackedPersonnel) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 15;
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Puesto de Comando", pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text("Datos del Incidente", margin, y);
+    y += 2;
+    autoTable(doc, {
+        body: [
+            ['Tipo de Siniestro', incidentDetails.type || '-'],
+            ['Dirección', incidentDetails.address || '-'],
+            ['Comuna', incidentDetails.district || '-'],
+            ['Fecha y Hora de Alarma', incidentDetails.alarmTime || '-'],
+            ['Jefe del Cuerpo en el Lugar', incidentDetails.chiefOnScene || '-'],
+            ['Jefe de la Emergencia', incidentDetails.incidentCommander || '-'],
+        ],
+        startY: y,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 1.5 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    y = createPdfTable(doc, 'Unidades en Intervención', ['Unidad', 'A Cargo', 'Dot.', 'H. Salida', 'H. Lugar', 'H. Regreso', 'Novedades'], 
+        trackedUnits.filter(u => u.dispatched).map(u => [
+            `${u.id}\n(${u.groupName})`, u.officerInCharge || '-', u.personnelCount || '-', u.departureTime, u.onSceneTime, u.returnTime, u.notes
+        ]), y);
+
+    y = createPdfTable(doc, 'Personal Clave en Intervención', ['Nombre', 'Tipo', 'Estación', 'Novedades'], 
+        trackedPersonnel.filter(p => p.onScene).map(p => [
+            p.name, p.type, p.groupName, p.notes
+        ]), y);
+    
+    doc.save(`Puesto_Comando_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const exportPersonnelToExcel = (personnel, title) => {
+    const data = personnel.map(p => ({
+        'L.P.': p.id,
+        'Jerarquía': p.rank,
+        'Apellido y Nombre': p.name,
+        'Estación': p.station || '',
+        'Destacamento': p.detachment || '',
+        'POC': p.poc || '',
+        'PART': p.part || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, title);
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    saveFile(excelBuffer, `${title.replace(/\s/g, '_')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+};
+
+export const exportUnitsToExcel = (units) => {
+    const data = units.map(u => ({ 'ID de Unidad': u }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Unidades');
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };

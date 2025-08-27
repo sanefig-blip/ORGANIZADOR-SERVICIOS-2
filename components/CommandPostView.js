@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon } from './icons.js';
+import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon, DownloadIcon } from './icons.js';
+import { exportCommandPostToPdf } from '../services/exportService.js';
 
 const initialIncidentDetails = {
     type: '',
@@ -179,9 +181,15 @@ const CommandPostView = ({ unitReportData }) => {
                     React.createElement(AnnotationIcon, { className: "w-8 h-8 text-yellow-300" }),
                     React.createElement("h2", { className: "text-2xl lg:text-3xl font-bold text-white" }, "Puesto de Comando - Control de Intervención")
                 ),
-                React.createElement("button", { onClick: handleReset, className: "flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors" },
-                    React.createElement(RefreshIcon, { className: "w-5 h-5" }),
-                    "Limpiar Hoja"
+                React.createElement("div", { className: "flex-shrink-0 flex items-center gap-2" },
+                    React.createElement("button", { onClick: () => exportCommandPostToPdf(incidentDetails, trackedUnits, trackedPersonnel), className: "flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-md transition-colors" },
+                        React.createElement(DownloadIcon, { className: "w-5 h-5" }),
+                        "Generar Reporte"
+                    ),
+                    React.createElement("button", { onClick: handleReset, className: "flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors" },
+                        React.createElement(RefreshIcon, { className: "w-5 h-5" }),
+                        "Limpiar Hoja"
+                    )
                 )
             ),
 

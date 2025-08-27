@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
@@ -10,7 +11,7 @@ import { servicePersonnelData as defaultServicePersonnel } from './data/serviceP
 import { defaultUnits } from './data/unitData.js';
 import { defaultServiceTemplates } from './data/serviceTemplates.js';
 import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.js';
-import { parseScheduleFromFile } from './services/wordImportService.js';
+import { parseScheduleFromFile, parseUnitReportFromExcel } from './services/wordImportService.js';
 import ScheduleDisplay from './components/ScheduleDisplay.js';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.js';
 import Nomenclador from './components/Nomenclador.js';
@@ -64,6 +65,7 @@ const App = () => {
     const [isExportMenuOpen, setExportMenuOpen] = useState(false);
     
     const fileInputRef = useRef(null);
+    const unitReportFileInputRef = useRef(null);
     const rosterInputRef = useRef(null);
     const importMenuRef = useRef(null);
     const exportMenuRef = useRef(null);
@@ -553,6 +555,45 @@ const App = () => {
         }
     };
 
+    const handleUnitReportImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file || !unitReport) return;
+        try {
+            const fileBuffer = await file.arrayBuffer();
+            const importedData = parseUnitReportFromExcel(fileBuffer);
+
+            if (importedData) {
+                const { stationName, units } = importedData;
+                
+                const reportCopy = JSON.parse(JSON.stringify(unitReport));
+                let stationUpdated = false;
+
+                for (const zone of reportCopy.zones) {
+                    const group = zone.groups.find(g => g.name.toUpperCase() === stationName.toUpperCase());
+                    if (group) {
+                        group.units = units;
+                        stationUpdated = true;
+                        break;
+                    }
+                }
+                
+                if (stationUpdated) {
+                    handleUpdateUnitReport(reportCopy);
+                    showToast(`Reporte de unidades para "${stationName}" importado con éxito.`);
+                } else {
+                    alert(`No se encontró la estación "${stationName}" en el reporte actual.`);
+                }
+            } else {
+                alert("No se pudo procesar el archivo Excel. Verifique el formato.");
+            }
+        } catch (error) {
+            console.error("Error al importar el reporte de unidades:", error);
+            alert("Hubo un error al procesar el archivo Excel.");
+        } finally {
+            if (unitReportFileInputRef.current) unitReportFileInputRef.current.value = '';
+        }
+    };
+
     const handleRosterImport = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -720,6 +761,7 @@ const App = () => {
     return (
         React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen font-sans" },
             React.createElement("input", { type: "file", ref: fileInputRef, onChange: handleFileImport, style: { display: 'none' }, accept: ".xlsx,.xls,.docx,.ods" }),
+            React.createElement("input", { type: "file", ref: unitReportFileInputRef, onChange: handleUnitReportImport, style: { display: 'none' }, accept: ".xlsx,.xls" }),
             React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json" }),
             React.createElement("header", { className: "bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
                 React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
@@ -750,10 +792,13 @@ const App = () => {
                                     React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}` })
                                 ),
                                 isImportMenuOpen && (
-                                    React.createElement("div", { className: "absolute right-0 mt-2 w-64 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                    React.createElement("div", { className: "absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                         React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical" },
                                             React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Horario (Word/Excel)"
+                                            ),
+                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
                                             ),
                                             React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"

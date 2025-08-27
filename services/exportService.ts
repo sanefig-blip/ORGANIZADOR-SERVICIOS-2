@@ -1,8 +1,11 @@
+
+
+
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS } from '../types';
+import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -440,10 +443,8 @@ export const exportRosterTemplate = () => {
 
 export const exportUnitReportToPdf = (reportData: UnitReportData) => {
     const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.height;
     const pageWidth = doc.internal.pageSize.width;
     const margin = 14;
-    let y = 0; // y position is managed by autoTable
 
     const drawPageHeader = () => {
         doc.setFontSize(16);
@@ -457,8 +458,6 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
         const reportDateTime = reportData.reportDate || new Date().toLocaleString('es-AR');
         doc.text(reportDateTime, pageWidth - margin, 15, { align: 'right' });
     };
-
-    drawPageHeader(); // Draw header on the first page
 
     const allRows: any[] = [];
     
@@ -487,7 +486,6 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
                 }
             }]);
 
-            // Add table data for the group
             group.units.forEach(unit => {
                 allRows.push([
                     unit.id,
@@ -523,11 +521,207 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
             4: { cellWidth: 15, halign: 'center' },
         },
         didDrawPage: (data) => {
-            if (data.pageNumber > 1) {
-                drawPageHeader();
-            }
+            drawPageHeader();
         }
     });
 
     doc.save(`Reporte_Unidades_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+const createPdfTable = (doc: jsPDF, title: string, head: any[], body: any[][], startY: number) => {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 14, startY);
+    autoTable(doc, {
+        head: [head],
+        body: body,
+        startY: startY + 6,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' }, // zinc-700
+        styles: { fontSize: 8 }
+    });
+    return (doc as any).lastAutoTable.finalY + 10;
+};
+
+export const exportEraReportToPdf = (reportData: EraData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Trasvazadores E.R.A.", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+// FIX: Replace `flatMap` with `reduce` to fix TypeScript type inference issues.
+    const body = reportData.stations.reduce((acc: any[][], station) => {
+        if (!station.hasEquipment || station.equipment.length === 0) {
+            acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            const stationRows = station.equipment.map((equip, index) => [
+                index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                equip.brand,
+                equip.voltage,
+                equip.condition,
+                equip.dependency
+            ]);
+            acc.push(...stationRows);
+        }
+        return acc;
+    }, []);
+
+    autoTable(doc, {
+        head: [['ESTACIÓN', 'MARCA', 'VOLTAJE', 'COND.', 'DEPENDENCIA']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_ERA_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+export const exportGeneratorReportToPdf = (reportData: GeneratorData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Grupos Electrógenos", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+// FIX: Replace `flatMap` with `reduce` to fix TypeScript type inference issues.
+    const body = reportData.stations.reduce((acc: any[][], station) => {
+        if (!station.hasEquipment || station.equipment.length === 0) {
+            acc.push([{ content: station.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            const stationRows = station.equipment.map((equip, index) => [
+                index === 0 ? { content: station.name, rowSpan: station.equipment.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                equip.brand,
+                equip.kva,
+                equip.condition,
+                equip.dependency
+            ]);
+            acc.push(...stationRows);
+        }
+        return acc;
+    }, []);
+
+    autoTable(doc, {
+        head: [['ESTACIÓN', 'MARCA', 'KVA', 'COND.', 'DEPENDENCIA']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_Grupos_Electrogenos_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
+export const exportUnitStatusToPdf = (filteredUnits: any[]) => {
+    const doc = new jsPDF('landscape');
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Estado de Unidades Filtradas", 14, y);
+    y += 10;
+
+    autoTable(doc, {
+        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'Personal', 'Ubicación']],
+        body: filteredUnits.map(u => [
+            u.id, u.type, u.status, u.officerInCharge || '-', u.personnelCount ?? '-', u.groupName
+        ]),
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 8 }
+    });
+
+    doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
+};
+
+export const exportCommandPostToPdf = (incidentDetails: any, trackedUnits: any[], trackedPersonnel: any[]) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+    let y = 15;
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Puesto de Comando", pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text("Datos del Incidente", margin, y);
+    y += 2;
+    autoTable(doc, {
+        body: [
+            ['Tipo de Siniestro', incidentDetails.type || '-'],
+            ['Dirección', incidentDetails.address || '-'],
+            ['Comuna', incidentDetails.district || '-'],
+            ['Fecha y Hora de Alarma', incidentDetails.alarmTime || '-'],
+            ['Jefe del Cuerpo en el Lugar', incidentDetails.chiefOnScene || '-'],
+            ['Jefe de la Emergencia', incidentDetails.incidentCommander || '-'],
+        ],
+        startY: y,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 1.5 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+
+    y = createPdfTable(doc, 'Unidades en Intervención', ['Unidad', 'A Cargo', 'Dot.', 'H. Salida', 'H. Lugar', 'H. Regreso', 'Novedades'], 
+        trackedUnits.filter(u => u.dispatched).map(u => [
+            `${u.id}\n(${u.groupName})`, u.officerInCharge || '-', u.personnelCount || '-', u.departureTime, u.onSceneTime, u.returnTime, u.notes
+        ]), y);
+
+    y = createPdfTable(doc, 'Personal Clave en Intervención', ['Nombre', 'Tipo', 'Estación', 'Novedades'], 
+        trackedPersonnel.filter(p => p.onScene).map(p => [
+            p.name, p.type, p.groupName, p.notes
+        ]), y);
+    
+    doc.save(`Puesto_Comando_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const exportPersonnelToExcel = (personnel: Personnel[], title: string) => {
+    const data = personnel.map(p => ({
+        'L.P.': p.id,
+        'Jerarquía': p.rank,
+        'Apellido y Nombre': p.name,
+        'Estación': p.station || '',
+        'Destacamento': p.detachment || '',
+        'POC': p.poc || '',
+        'PART': p.part || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, title);
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    saveFile(excelBuffer, `${title.replace(/\s/g, '_')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+};
+
+export const exportUnitsToExcel = (units: string[]) => {
+    const data = units.map(u => ({ 'ID de Unidad': u }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Unidades');
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };
