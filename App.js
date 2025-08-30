@@ -819,16 +819,20 @@ const App = () => {
                                 isImportMenuOpen && (
                                     React.createElement("div", { className: "absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                         React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical" },
-                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                            React.createElement("button", { type: "button", onClick: () => { fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Horario (Word/Excel)"
                                             ),
-                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                            React.createElement("button", { type: "button", onClick: () => { unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
                                             ),
-                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                            React.createElement("button", { type: "button", onClick: () => { setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"
                                             ),
-                                            React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                            React.createElement("button", { type: "button", onClick: () => { openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(BookmarkIcon, { className: 'w-4 h-4' }), " Añadir desde Plantilla"
                                             )
                                         )
@@ -844,11 +848,14 @@ const App = () => {
                                 ),
                                 isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                     React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                        React.createElement("button", { type: "button", onClick: () => { exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar General"),
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                        React.createElement("button", { type: "button", onClick: () => { exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar por Hora"),
-                                        React.createElement("a", { href: "#", onClick: (e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+// FIX: Changed <a> to <button> for accessibility and to resolve type error.
+                                        React.createElement("button", { type: "button", onClick: () => { setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar Plantilla")
                                     )
                                 )

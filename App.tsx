@@ -11,7 +11,7 @@ import { servicePersonnelData as defaultServicePersonnel } from './data/serviceP
 import { defaultUnits } from './data/unitData.ts';
 import { defaultServiceTemplates } from './data/serviceTemplates.ts';
 import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.ts';
-import { parseScheduleFromFile, parseUnitReportFromExcel } from './services/wordImportService.ts';
+import { parseScheduleFromFile, parseFullUnitReportFromExcel } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
@@ -575,40 +575,31 @@ const App: React.FC = () => {
 
     const handleUnitReportImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !unitReport) return;
-        try {
-            const fileBuffer = await file.arrayBuffer();
-            const importedData = parseUnitReportFromExcel(fileBuffer);
+        if (!file) return;
 
-            if (importedData) {
-                const { stationName, units } = importedData;
+        if (window.confirm("¿Está seguro de que desea reemplazar todo el reporte de unidades con los datos de este archivo? Esta acción no se puede deshacer.")) {
+            try {
+                const fileBuffer = await file.arrayBuffer();
+                const newUnitReportData = parseFullUnitReportFromExcel(fileBuffer); 
                 
-                const reportCopy = JSON.parse(JSON.stringify(unitReport));
-                let stationUpdated = false;
-
-                for (const zone of reportCopy.zones) {
-                    const group = zone.groups.find((g: any) => g.name.toUpperCase() === stationName.toUpperCase());
-                    if (group) {
-                        group.units = units;
-                        stationUpdated = true;
-                        break;
-                    }
-                }
-                
-                if (stationUpdated) {
-                    handleUpdateUnitReport(reportCopy);
-                    showToast(`Reporte de unidades para "${stationName}" importado con éxito.`);
+                if (newUnitReportData) {
+                    handleUpdateUnitReport(newUnitReportData);
+                    showToast("Reporte de unidades importado y reemplazado con éxito.");
                 } else {
-                    alert(`No se encontró la estación "${stationName}" en el reporte actual.`);
+                    alert("No se pudo procesar el archivo Excel. Verifique el formato del reporte completo.");
                 }
-            } else {
-                alert("No se pudo procesar el archivo Excel. Verifique el formato.");
+            } catch (error: any) {
+                console.error("Error al importar el reporte de unidades:", error);
+                alert(`Hubo un error al procesar el archivo Excel: ${error.message}`);
+            } finally {
+                if (unitReportFileInputRef.current) {
+                    unitReportFileInputRef.current.value = '';
+                }
             }
-        } catch (error) {
-            console.error("Error al importar el reporte de unidades:", error);
-            alert("Hubo un error al procesar el archivo Excel.");
-        } finally {
-            if (unitReportFileInputRef.current) unitReportFileInputRef.current.value = '';
+        } else {
+             if (unitReportFileInputRef.current) {
+                unitReportFileInputRef.current.value = '';
+            }
         }
     };
 
@@ -713,74 +704,60 @@ const App: React.FC = () => {
         switch (view) {
             case 'unit-report':
                 if (!unitReport) return null;
-                return (
-                    <UnitReportDisplay
-                        reportData={unitReport}
-                        searchTerm={searchTerm}
-                        onSearchChange={setSearchTerm}
-                        onUpdateReport={handleUpdateUnitReport}
-                        commandPersonnel={commandPersonnel}
-                        servicePersonnel={servicePersonnel}
-                        unitList={unitList}
-                    />
-                );
+                return React.createElement(UnitReportDisplay, {
+                        reportData: unitReport,
+                        searchTerm: searchTerm,
+                        onSearchChange: setSearchTerm,
+                        onUpdateReport: handleUpdateUnitReport,
+                        commandPersonnel: commandPersonnel,
+                        servicePersonnel: servicePersonnel,
+                        unitList: unitList
+                    });
             case 'unit-status':
                 if (!unitReport) return null;
-                return <UnitStatusView unitReportData={unitReport} />;
+                return React.createElement(UnitStatusView, { unitReportData: unitReport });
             case 'command-post':
                 if (!unitReport) return null;
-                return <CommandPostView unitReportData={unitReport} />;
+                return React.createElement(CommandPostView, { unitReportData: unitReport });
             case 'era-report':
                 if (!eraReport) return null;
-                return (
-                    <EraReportDisplay
-                        reportData={eraReport}
-                        onUpdateReport={handleUpdateEraReport}
-                    />
-                );
+                return React.createElement(EraReportDisplay, {
+                        reportData: eraReport,
+                        onUpdateReport: handleUpdateEraReport
+                    });
             case 'generator-report':
                 if (!generatorReport) return null;
-                return (
-                    <GeneratorReportDisplay
-                        reportData={generatorReport}
-                        onUpdateReport={handleUpdateGeneratorReport}
-                    />
-                );
+                return React.createElement(GeneratorReportDisplay, {
+                    reportData: generatorReport,
+                    onUpdateReport: handleUpdateGeneratorReport
+                });
             case 'materials':
                 if (!materialsReport) return null;
-                return (
-                    <MaterialsDisplay
-                        reportData={materialsReport}
-                        onUpdateReport={handleUpdateMaterialsReport}
-                    />
-                );
+                return React.createElement(MaterialsDisplay, {
+                    reportData: materialsReport,
+                    onUpdateReport: handleUpdateMaterialsReport
+                });
             case 'schedule':
                 if (!filteredSchedule) return null;
-                return (
-                    <ScheduleDisplay
-                        schedule={filteredSchedule} displayDate={displayDate} selectedServiceIds={selectedServiceIds} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} unitList={unitList}
-                        onDateChange={handleDateChange} onUpdateService={handleUpdateService} onUpdateCommandStaff={handleUpdateCommandStaff} onAddNewService={handleAddNewService} onMoveService={handleMoveService} onToggleServiceSelection={handleToggleServiceSelection} onSelectAllServices={handleSelectAllServices} onSaveAsTemplate={handleSaveAsTemplate} onReplaceFromTemplate={(serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId })} onImportGuardLine={() => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule!.commandStaff, commandPersonnel), true)}
-                        onDeleteService={handleDeleteService}
-                        searchTerm={searchTerm} onSearchChange={setSearchTerm}
-                    />
-                );
+                return React.createElement(ScheduleDisplay, {
+                        schedule: filteredSchedule, displayDate: displayDate, selectedServiceIds: selectedServiceIds, commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, unitList: unitList,
+                        onDateChange: handleDateChange, onUpdateService: handleUpdateService, onUpdateCommandStaff: handleUpdateCommandStaff, onAddNewService: handleAddNewService, onMoveService: handleMoveService, onToggleServiceSelection: handleToggleServiceSelection, onSelectAllServices: handleSelectAllServices, onSaveAsTemplate: handleSaveAsTemplate, onReplaceFromTemplate: (serviceId, type) => openTemplateModal({ mode: 'replace', serviceType: type, serviceToReplaceId: serviceId }), onImportGuardLine: () => handleUpdateCommandStaff(loadGuardLineFromRoster(displayDate, schedule!.commandStaff, commandPersonnel), true),
+                        onDeleteService: handleDeleteService,
+                        searchTerm: searchTerm, onSearchChange: setSearchTerm,
+                    });
             case 'time-grouped':
                 if (!filteredSchedule) return null;
-                return (
-                    <TimeGroupedScheduleDisplay
-                        assignmentsByTime={getAssignmentsByTime}
-                        onAssignmentStatusChange={handleAssignmentStatusChange}
-                    />
-                );
+                return React.createElement(TimeGroupedScheduleDisplay, {
+                        assignmentsByTime: getAssignmentsByTime,
+                        onAssignmentStatusChange: handleAssignmentStatusChange
+                    });
             case 'nomenclador':
-                return (
-                    <Nomenclador
-                        commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} units={unitList} roster={roster}
-                        onAddCommandPersonnel={(item) => updateAndSaveCommandPersonnel([...commandPersonnel, item])} onUpdateCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p))} onRemoveCommandPersonnel={(item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id))}
-                        onAddServicePersonnel={(item) => updateAndSaveServicePersonnel([...servicePersonnel, item])} onUpdateServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p))} onRemoveServicePersonnel={(item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id))}
-                        onUpdateUnits={updateAndSaveUnits} onUpdateRoster={updateAndSaveRoster}
-                     />
-                 );
+                return React.createElement(Nomenclador, {
+                        commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel, units: unitList, roster: roster,
+                        onAddCommandPersonnel: (item) => updateAndSaveCommandPersonnel([...commandPersonnel, item]), onUpdateCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.map(p => p.id === item.id ? item : p)), onRemoveCommandPersonnel: (item) => updateAndSaveCommandPersonnel(commandPersonnel.filter(p => p.id !== item.id)),
+                        onAddServicePersonnel: (item) => updateAndSaveServicePersonnel([...servicePersonnel, item]), onUpdateServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.map(p => p.id === item.id ? item : p)), onRemoveServicePersonnel: (item) => updateAndSaveServicePersonnel(servicePersonnel.filter(p => p.id !== item.id)),
+                        onUpdateUnits: updateAndSaveUnits, onUpdateRoster: updateAndSaveRoster
+                     });
             default:
                 return null;
         }
@@ -790,102 +767,102 @@ const App: React.FC = () => {
     
     if (!schedule || !displayDate || !unitReport || !eraReport || !generatorReport || !materialsReport) {
         return (
-            <div className="bg-zinc-900 text-white min-h-screen flex justify-center items-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" />
-            </div>
+            React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen flex justify-center items-center" },
+                React.createElement("div", { className: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" })
+            )
         );
     }
 
     return (
-        <div className="bg-zinc-900 text-white min-h-screen font-sans">
-            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.docx,.ods" />
-            <input type="file" ref={unitReportFileInputRef} onChange={handleUnitReportImport} style={{ display: 'none' }} accept=".xlsx,.xls" />
-            <input type="file" ref={rosterInputRef} onChange={handleRosterImport} style={{ display: 'none' }} accept=".json" />
-            <header className="bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0">
-                        <div className="flex items-center mb-4 sm:mb-0">
-                            <button onClick={handleResetData} className="mr-2 text-zinc-400 hover:text-white transition-colors" aria-label="Reiniciar Datos"><RefreshIcon className="w-6 h-6" /></button>
-                            <button onClick={() => setIsHelpModalOpen(true)} className="mr-4 text-zinc-400 hover:text-white transition-colors" aria-label="Ayuda"><QuestionMarkCircleIcon className="w-6 h-6" /></button>
-                            <img src="https://ci.bomberosdelaciudad.gob.ar/LibJs/metroBoostrap2/img/fondo%20neutro.png" alt="Logo Bomberos de la Ciudad" className="h-12 mr-3" />
-                            <div className="flex flex-col justify-center">
-                                <h1 className="text-xl sm:text-2xl font-bold text-white">Bomberos de la Ciudad</h1>
-                                <p className="text-xs text-zinc-400 -mt-1">Organizador de Unidades y Guardia</p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button className={getButtonClass('unit-report')} onClick={() => setView('unit-report')}><FireIcon className="w-5 h-5" /> Reporte de Unidades</button>
-                            <button className={getButtonClass('unit-status')} onClick={() => setView('unit-status')}><FilterIcon className="w-5 h-5" /> Estado de Unidades</button>
-                            <button className={getButtonClass('command-post')} onClick={() => setView('command-post')}><AnnotationIcon className="w-5 h-5" /> Puesto Comando</button>
-                            <button className={getButtonClass('era-report')} onClick={() => setView('era-report')}><LightningBoltIcon className="w-5 h-5" /> Trasvazadores E.R.A.</button>
-                            <button className={getButtonClass('generator-report')} onClick={() => setView('generator-report')}><LightningBoltIcon className="w-5 h-5" /> Grupos Electrógenos</button>
-                            <button className={getButtonClass('materials')} onClick={() => setView('materials')}><CubeIcon className="w-5 h-5" /> Materiales</button>
-                            <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Planificador</button>
-                            <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className="w-5 h-5" /> Vista por Hora</button>
-                            <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className="w-5 h-5" /> Nomencladores</button>
+        React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen font-sans" },
+            React.createElement("input", { type: "file", ref: fileInputRef, onChange: handleFileImport, style: { display: 'none' }, accept: ".xlsx,.xls,.docx,.ods" }),
+            React.createElement("input", { type: "file", ref: unitReportFileInputRef, onChange: handleUnitReportImport, style: { display: 'none' }, accept: ".xlsx,.xls" }),
+            React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json" }),
+            React.createElement("header", { className: "bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
+                React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
+                    React.createElement("div", { className: "flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0" },
+                        React.createElement("div", { className: "flex items-center mb-4 sm:mb-0" },
+                            React.createElement("button", { onClick: handleResetData, className: "mr-2 text-zinc-400 hover:text-white transition-colors", "aria-label": "Reiniciar Datos"}, React.createElement(RefreshIcon, { className: "w-6 h-6" })),
+                            React.createElement("button", { onClick: () => setIsHelpModalOpen(true), className: "mr-4 text-zinc-400 hover:text-white transition-colors", "aria-label": "Ayuda"}, React.createElement(QuestionMarkCircleIcon, { className: "w-6 h-6" })),
+                            React.createElement("img", { src: "https://ci.bomberosdelaciudad.gob.ar/LibJs/metroBoostrap2/img/fondo%20neutro.png", alt: "Logo Bomberos de la Ciudad", className: "h-12 mr-3" }),
+                            React.createElement("div", { className: "flex flex-col justify-center" },
+                                React.createElement("h1", { className: "text-xl sm:text-2xl font-bold text-white" }, "Bomberos de la Ciudad"),
+                                React.createElement("p", { className: "text-xs text-zinc-400 -mt-1" }, "Organizador de Unidades y Guardia")
+                            )
+                        ),
+                        React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },
+                            React.createElement("button", { className: getButtonClass('unit-report'), onClick: () => setView('unit-report') }, React.createElement(FireIcon, { className: "w-5 h-5" }), " Reporte de Unidades"),
+                            React.createElement("button", { className: getButtonClass('unit-status'), onClick: () => setView('unit-status') }, React.createElement(FilterIcon, { className: "w-5 h-5" }), " Estado de Unidades"),
+                            React.createElement("button", { className: getButtonClass('command-post'), onClick: () => setView('command-post') }, React.createElement(AnnotationIcon, { className: "w-5 h-5" }), " Puesto Comando"),
+                            React.createElement("button", { className: getButtonClass('era-report'), onClick: () => setView('era-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Trasvazadores E.R.A."),
+                            React.createElement("button", { className: getButtonClass('generator-report'), onClick: () => setView('generator-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Grupos Electrógenos"),
+                            React.createElement("button", { className: getButtonClass('materials'), onClick: () => setView('materials') }, React.createElement(CubeIcon, { className: "w-5 h-5" }), " Materiales"),
+                            React.createElement("button", { className: getButtonClass('schedule'), onClick: () => setView('schedule') }, React.createElement(ClipboardListIcon, { className: "w-5 h-5" }), " Planificador"),
+                            React.createElement("button", { className: getButtonClass('time-grouped'), onClick: () => setView('time-grouped') }, React.createElement(ClockIcon, { className: "w-5 h-5" }), " Vista por Hora"),
+                            React.createElement("button", { className: getButtonClass('nomenclador'), onClick: () => setView('nomenclador') }, React.createElement(BookOpenIcon, { className: "w-5 h-5" }), " Nomencladores"),
                             
-                            <div className="relative" ref={importMenuRef}>
-                                <button onClick={() => setImportMenuOpen(prev => !prev)} className={'flex items-center gap-2 px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors'}>
-                                    <UploadIcon className={'w-5 h-5'} />
-                                    <span>Importar</span>
-                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {isImportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
-                                        <div className="py-1" role="menu" aria-orientation="vertical">
-                                            <a href="#" onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                                <UploadIcon className={'w-4 h-4'} /> Importar Horario (Word/Excel)
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                                <UploadIcon className={'w-4 h-4'} /> Importar Reporte Unidades (Excel)
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); setIsRosterModalOpen(true); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                                <UploadIcon className={'w-4 h-4'} /> Importar Rol de Guardia (.json)
-                                            </a>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                                <BookmarkIcon className={'w-4 h-4'} /> Añadir desde Plantilla
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            React.createElement("div", { className: "relative", ref: importMenuRef },
+                                React.createElement("button", { onClick: () => setImportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors' },
+                                    React.createElement(UploadIcon, { className: 'w-5 h-5' }),
+                                    React.createElement("span", null, "Importar"),
+                                    React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isImportMenuOpen ? 'rotate-180' : ''}` })
+                                ),
+                                isImportMenuOpen && (
+                                    React.createElement("div", { className: "absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                        React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical" },
+                                            React.createElement("button", { type: "button", onClick: () => { fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Horario (Word/Excel)"
+                                            ),
+                                            React.createElement("button", { type: "button", onClick: () => { unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
+                                            ),
+                                            React.createElement("button", { type: "button", onClick: () => { setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"
+                                            ),
+                                            React.createElement("button", { type: "button", onClick: () => { openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(BookmarkIcon, { className: 'w-4 h-4' }), " Añadir desde Plantilla"
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
 
-                            <div className="relative" ref={exportMenuRef}>
-                                <button onClick={() => setExportMenuOpen(prev => !prev)} className={'flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors'}>
-                                    <DownloadIcon className={'w-5 h-5'} />
-                                    <span>Exportar</span>
-                                    <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {isExportMenuOpen && <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in">
-                                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleToWord({ ...schedule!, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className={'w-4 h-4'} /> Exportar General</a>
-                                        <a href="#" onClick={(e) => { e.preventDefault(); exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className={'w-4 h-4'} /> Exportar por Hora</a>
-                                        <a href="#" onClick={(e) => { e.preventDefault(); setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }} className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left" role="menuitem">
-                                            <DownloadIcon className={'w-4 h-4'} /> Exportar Plantilla</a>
-                                    </div>
-                                </div>}
-                            </div>
+                            React.createElement("div", { className: "relative", ref: exportMenuRef },
+                                React.createElement("button", { onClick: () => setExportMenuOpen(prev => !prev), className: 'flex items-center gap-2 px-4 py-2 rounded-md bg-green-600 hover:bg-green-500 text-white font-medium transition-colors' },
+                                    React.createElement(DownloadIcon, { className: 'w-5 h-5' }),
+                                    React.createElement("span", null, "Exportar"),
+                                    React.createElement(ChevronDownIcon, { className: `w-4 h-4 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}` })
+                                ),
+                                isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
+                                    React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
+                                        React.createElement("button", { type: "button", onClick: () => { exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar General"),
+                                        React.createElement("button", { type: "button", onClick: () => { exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar por Hora"),
+                                        React.createElement("button", { type: "button", onClick: () => { setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                            React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar Plantilla")
+                                    )
+                                )
+                            ),
                             
-                            {selectedServiceIds.size > 0 && view === 'schedule' && (
-                                <button onClick={handleToggleVisibilityForSelected} className={`flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
-                                    {visibilityAction.action === 'hide' ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                                    {`${visibilityAction.label} (${selectedServiceIds.size})`}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </header>
-            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                {renderContent()}
-            </main>
-            {isHelpModalOpen && <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} unitList={unitList} commandPersonnel={commandPersonnel} servicePersonnel={servicePersonnel} />}
-            {isRosterModalOpen && <RosterImportModal isOpen={isRosterModalOpen} onClose={() => setIsRosterModalOpen(false)} onConfirm={() => rosterInputRef.current?.click()} />}
-            {isTemplateModalOpen && <ServiceTemplateModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} templates={serviceTemplates} onSelectTemplate={(template) => handleSelectTemplate(template, templateModalProps)} onDeleteTemplate={handleDeleteTemplate} />}
-            {isExportTemplateModalOpen && <ExportTemplateModal isOpen={isExportTemplateModalOpen} onClose={() => setIsExportTemplateModalOpen(false)} onExport={handleExportAsTemplate} />}
-        </div>
+                            selectedServiceIds.size > 0 && view === 'schedule' && (
+                                React.createElement("button", { onClick: handleToggleVisibilityForSelected, className: `flex items-center gap-2 px-4 py-2 rounded-md text-white font-medium transition-colors animate-fade-in ${visibilityAction.action === 'hide' ? 'bg-red-600 hover:bg-red-500' : 'bg-purple-600 hover:bg-purple-500'}`},
+                                    visibilityAction.action === 'hide' ? React.createElement(EyeOffIcon, { className: "w-5 h-5" }) : React.createElement(EyeIcon, { className: "w-5 h-5" }),
+                                    `${visibilityAction.label} (${selectedServiceIds.size})`
+                                )
+                            )
+                        )
+                    )
+                )
+            ),
+            React.createElement("main", { className: "container mx-auto p-4 sm:p-6 lg:p-8" },
+                renderContent()
+            ),
+            isHelpModalOpen && React.createElement(HelpModal, { isOpen: isHelpModalOpen, onClose: () => setIsHelpModalOpen(false), unitList: unitList, commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel }),
+            isRosterModalOpen && React.createElement(RosterImportModal, { isOpen: isRosterModalOpen, onClose: () => setIsRosterModalOpen(false), onConfirm: () => rosterInputRef.current?.click() }),
+            isTemplateModalOpen && React.createElement(ServiceTemplateModal, { isOpen: isTemplateModalOpen, onClose: () => setIsTemplateModalOpen(false), templates: serviceTemplates, onSelectTemplate: (template) => handleSelectTemplate(template, templateModalProps), onDeleteTemplate: handleDeleteTemplate }),
+            isExportTemplateModalOpen && React.createElement(ExportTemplateModal, { isOpen: isExportTemplateModalOpen, onClose: () => setIsExportTemplateModalOpen(false), onExport: handleExportAsTemplate })
+        )
     );
 };
 

@@ -1,7 +1,6 @@
-
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
-import { Service, Assignment, Schedule, Officer, Rank, FireUnit } from '../types';
+import { Service, Assignment, Schedule, Officer, Rank, FireUnit, UnitGroup, Zone, UnitReportData } from '../types';
 
 const MONTH_NAMES: { [key: string]: number } = { "ENERO": 0, "FEBRERO": 1, "MARZO": 2, "ABRIL": 3, "MAYO": 4, "JUNIO": 5, "JULIO": 6, "AGOSTO": 7, "SEPTIEMBRE": 8, "OCTUBRE": 9, "NOVIEMBRE": 10, "DICIEMBRE": 11 };
 
@@ -113,81 +112,193 @@ function parseTemplateExcel(sheet: XLSX.WorkSheet): Partial<Schedule> {
     };
 }
 
-export const parseUnitReportFromExcel = (fileBuffer: ArrayBuffer): { stationName: string; units: FireUnit[] } | null => {
+
+export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitReportData | null => {
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 
-    if (rows.length < 5) return null;
+    const stationMap: Map<string, UnitGroup> = new Map();
 
-    let stationName: string | null = null;
-    const stationNameCell = rows[3]?.[4] || ''; // E4
-    
-    // Match "ESTACION X 'LUGANO'" or "ESTACION X LUGANO"
-    const stationNameMatch = stationNameCell.match(/ESTACION\s+[IVXLCDM]+\s*(?:['"]?)([^'"]+)(?:['"]?)/i);
+    const processBlock = (startRow: number, endRow: number, colOffset: number) => {
+        let stationName: string | null = null;
+        let stationRawName: string | null = null;
 
-    if (stationNameMatch && stationNameMatch[1]) {
-        const numberMatch = stationNameCell.match(/ESTACION\s+([IVXLCDM]+)/i);
-        const stationNumber = numberMatch ? `${numberMatch[1]} ` : '';
-        const extractedName = stationNameMatch[1].trim();
-        // Reconstruct the full name as used in the app data
-        stationName = `ESTACIÓN ${stationNumber}${extractedName}`.trim();
-    }
-    
-    if (!stationName) {
-        console.error("Could not find station name in cell E4");
-        return null;
-    }
+        // Find the station name in the first few rows of the block
+        for (let r = startRow; r < Math.min(startRow + 5, endRow); r++) {
+            const cellValue = rows[r]?.[colOffset];
+            if (cellValue && (String(cellValue).toUpperCase().startsWith('ESTACION') || String(cellValue).toUpperCase().startsWith('DTO'))) {
+                stationRawName = String(cellValue).trim();
+                
+                // Normalize the name
+                stationName = stationRawName
+                    .replace(/\s*"/g, ' ') // remove quotes
+                    .replace(/\s+/g, ' ') // collapse spaces
+                    .trim();
 
-    const headerRowIndex = rows.findIndex(row => row && row[0] === 'UNIDADES');
-    if (headerRowIndex === -1) {
-         console.error("Could not find header row with 'UNIDADES'");
-        return null;
-    }
-
-    const headers = rows[headerRowIndex].map(h => String(h || '').trim());
-    const unitsData = rows.slice(headerRowIndex + 1);
-
-    const units: FireUnit[] = [];
-
-    const col = (header: string) => headers.indexOf(header);
-
-    for (const row of unitsData) {
-        if (!row[col('UNIDADES')] || String(row[col('UNIDADES')]).trim() === 'TOTALES') break;
+                break;
+            }
+        }
         
-        const cond = String(row[col('COND')] || '').trim().toUpperCase();
-        const dep = String(row[col('DEP')] || '').trim();
-
-        let status = 'Estado Desconocido';
-        let outOfServiceReason = undefined;
-
-        if (cond === 'P/S') status = 'Para Servicio';
-        else if (cond === 'F/S') status = 'Fuera de Servicio';
-        else if (cond === 'RES') status = 'Reserva';
-        
-        if (dep.toLowerCase().includes('préstamo')) {
-            status = 'A Préstamo';
+        if (!stationName) {
+            // This might happen for blocks like "JEFE DE INSPECCIONES" which we can ignore
+            return;
         }
 
-        if (status === 'Fuera de Servicio' && dep && !dep.toLowerCase().includes('en dependencia')) {
-             outOfServiceReason = dep;
+        const group: UnitGroup = { name: stationName, units: [] };
+        
+        for (let r = startRow; r < endRow; r++) {
+            const row = rows[r];
+            if (!row) continue;
+            
+            const type = row[colOffset + 0] ? String(row[colOffset + 0]).trim() : '';
+            const id = row[colOffset + 1] ? String(row[colOffset + 1]).trim() : '';
+            
+            // Heuristic to identify a unit row
+            if (type && id && id.length > 2 && !type.toUpperCase().startsWith('ESTACION') && !type.toUpperCase().startsWith('DTO') && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
+                const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim();
+                const details = String(row[colOffset + 3] || '').trim();
+
+                let status = 'Para Servicio';
+                let outOfServiceReason: string | undefined = undefined;
+                let officerInCharge: string | undefined = details;
+                
+                // More robust status detection
+                if (statusRaw.toUpperCase().includes('F/S')) {
+                    status = 'Fuera de Servicio';
+                    officerInCharge = undefined;
+                    // Extract reason from details if available
+                    outOfServiceReason = details || statusRaw.replace(/F\/S/i, '').trim() || undefined;
+                } else if (statusRaw.toUpperCase().includes('RESERVA')) {
+                    status = 'Reserva';
+                    officerInCharge = undefined; 
+                } else if (statusRaw.toUpperCase().includes('A/P')) {
+                    status = 'A Préstamo';
+                    officerInCharge = undefined;
+                    outOfServiceReason = details || statusRaw.replace(/A\/P/i, '').trim() || undefined;
+                } else if (details) {
+                     officerInCharge = details;
+                } else {
+                     officerInCharge = statusRaw;
+                }
+
+                // If officerInCharge is one of the statuses, clear it
+                if (['PARA SERVICIO', 'FUERA DE SERVICIO', 'RESERVA', 'A PRÉSTAMO'].includes((officerInCharge || '').toUpperCase())) {
+                    officerInCharge = undefined;
+                }
+                
+                group.units.push({
+                    id,
+                    type,
+                    status,
+                    officerInCharge: officerInCharge || undefined,
+                    outOfServiceReason,
+                    personnelCount: null, // This info is not in the provided excel
+                });
+            }
         }
+        if (group.units.length > 0) {
+            stationMap.set(group.name, group);
+        }
+    };
+    
+    // Find starting points of each station/destacamento block
+    const blockStarts: {row: number, col: number}[] = [];
+    rows.forEach((row, r) => {
+        if (row) {
+            [0, 4, 9].forEach(c => { // Check column A, E, J
+                const cellValue = row[c];
+                if (cellValue && (String(cellValue).toUpperCase().startsWith('ESTACION') || String(cellValue).toUpperCase().startsWith('DTO'))) {
+                   // Avoid adding duplicates if a name spans multiple cells
+                   if (!blockStarts.some(bs => bs.row === r)) {
+                       blockStarts.push({row: r, col: c});
+                   }
+                }
+            });
+        }
+    });
+    
+    // Sort blocks by row then column to process in order
+    blockStarts.sort((a, b) => a.row - b.row || a.col - b.col);
 
-        const unit: FireUnit = {
-            id: String(row[col('UNIDADES')] || '').trim(),
-            type: String(row[col('TIPO')] || '').trim(),
-            internalId: String(row[col('INT')] || '').trim(),
-            status: status,
-            outOfServiceReason: outOfServiceReason,
-            officerInCharge: String(row[col('A CARGO')] || '').trim() || undefined,
-            personnelCount: parseInt(row[col('DOT')], 10) || null,
-        };
-        units.push(unit);
+    for (let i = 0; i < blockStarts.length; i++) {
+        const start = blockStarts[i];
+        // Find the start of the next block to determine the end of the current one
+        const nextBlock = blockStarts[i + 1];
+        const endRow = nextBlock ? nextBlock.row : rows.length;
+        processBlock(start.row, endRow, start.col);
     }
+    
+    // Hardcoded zones based on the provided excel structure. This is brittle but necessary without more info.
+    const ZONES_LAYOUT: { [key: string]: string[] } = {
+        "ZONA I": ["ESTACION I", "ESTACION II", "DTO. POMPEYA", "ESTACION III", "DTO. BOCA", "ESTACION X"],
+        "ZONA II": ["ESTACION IV", "DTO. MISERERE", "DTO. RETIRO", "ESTACION V", "DTO. URQUIZA", "DTO. SAAVEDRA", "ESTACION VI", "DTO. PALERMO", "DTO. CHACARITA"],
+        "ZONA III": ["ESTACION VII", "ESTACION VIII", "DTO. VELEZ SARSFIELD", "ESTACION IX", "DTO. DEVOTO", "ESTACION XI"],
+        "OPERACIONES ESPECIALES": ["DTO. G.E.R. 1", "DTO. G.E.R. 2", "ESTACION BUSQUEDA Y RESCATE K9"],
+        "UNIDADES INTERVENCIONES RELEVANTES": ["O.C.O.B.", "DESTACAMENTO SISTEMA DE ASISTENCIA CRÍTICA", "Div. B.E.FE.R.", "TRANSPORTE FORENSE", "Estación BRIGADA DE EMERGENCIAS ESPECIALES"],
+        "TECNICO PERICIAL": ["COMPANIA TECNICO PERICIAL", "URIP CENTRO", "URIP NORTE"]
+    };
 
-    return { stationName, units };
+    const zones: Zone[] = Object.keys(ZONES_LAYOUT).map(name => ({ name, groups: [] }));
+
+    stationMap.forEach((group, groupName) => {
+        let assigned = false;
+        const normalizedGroupName = groupName.toUpperCase()
+            .replace(/["'“”]/g, "")
+            .replace(/\./g, "")
+            .replace("CTE GRAL A VAZQUEZ", "ESTACION V")
+            .replace("CRIO. MAYOR M. FIRMA PAZ", "ESTACION VI")
+            .replace("PUERTO MADERO", "ESTACION I")
+            .replace("PATRICIOS", "ESTACION II")
+            .replace("BARRACAS", "ESTACION III")
+            .replace("RECOLETA", "ESTACION IV")
+            .replace("FLORES", "ESTACION VII")
+            .replace("NUEVA CHICAGO", "ESTACION VIII")
+            .replace("VERSAILLES", "ESTACION IX")
+            .replace("LUGANO", "ESTACION X")
+            .replace("ALBARIÑO", "ESTACION XI")
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        for (const zone of zones) {
+             if (ZONES_LAYOUT[zone.name].some(prefix => normalizedGroupName.includes(prefix.toUpperCase().replace(/\./g, "")))) {
+                zone.groups.push(group);
+                assigned = true;
+                break;
+            }
+        }
+        if (!assigned) {
+             console.warn(`Could not assign station "${groupName}" (${normalizedGroupName}) to a zone.`);
+             // As a fallback, try to find a partial match
+             for (const zone of zones) {
+                if (ZONES_LAYOUT[zone.name].some(prefix => {
+                    const simplifiedPrefix = prefix.toUpperCase().replace(/\./g, "").replace("ESTACION", "").trim();
+                    return normalizedGroupName.includes(simplifiedPrefix);
+                })) {
+                    zone.groups.push(group);
+                    assigned = true;
+                    break;
+                }
+             }
+        }
+    });
+
+    const reportDateCell = rows.find(row => row && String(row[0]).includes('GUARDIA'));
+    const reportDate = reportDateCell ? String(reportDateCell[0]).replace('GUARDIA', '').trim() : new Date().toLocaleDateString('es-AR');
+
+    const newUnitReport: UnitReportData = {
+        reportDate: reportDate,
+        zones: zones.filter(z => z.groups.length > 0)
+    };
+    
+    if (newUnitReport.zones.length === 0) {
+        throw new Error("No se pudo analizar ninguna estación del archivo. Verifique el formato del reporte completo.");
+    }
+    
+    return newUnitReport;
 };
+
 
 const parseFullSchedule = (lines: string[]): Partial<Schedule> | null => {
     const schedule: Partial<Schedule> = { commandStaff: [], services: [], sportsEvents: [] };

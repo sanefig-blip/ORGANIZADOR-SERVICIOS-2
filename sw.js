@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fire-dept-organizer-cache-v24';
+const CACHE_NAME = 'fire-dept-organizer-cache-v26';
 const urlsToCache = [
   './',
   './index.html',
