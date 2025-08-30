@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData, MaterialsData } from './types.ts';
+import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData, MaterialsData, Zone, UnitGroup, MaterialLocation } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
 import { unitReportData as preloadedUnitReportData } from './data/unitReportData.ts';
 import { eraData as preloadedEraData } from './data/eraData.ts';
@@ -197,6 +197,35 @@ const App: React.FC = () => {
         } catch (e) {
             console.error("Failed to load or parse Materials report data, falling back to default.", e);
             materialsReportToLoad = preloadedMaterialsData;
+        }
+        
+        if (unitReportToLoad && materialsReportToLoad) {
+            const unitReportOrder = unitReportToLoad.zones.flatMap((zone: Zone) => 
+                zone.groups.map((group: UnitGroup) => group.name.trim())
+            );
+
+            const materialsMap = new Map<string, MaterialLocation>(
+                materialsReportToLoad.locations.map((loc: MaterialLocation) => [loc.name.trim(), loc])
+            );
+
+            const sortedAndSyncedLocations: MaterialLocation[] = [];
+            
+            unitReportOrder.forEach(name => {
+                if (materialsMap.has(name)) {
+                    sortedAndSyncedLocations.push(materialsMap.get(name)!);
+                } else {
+                    sortedAndSyncedLocations.push({ name: name, materials: [] });
+                }
+            });
+
+            // Compare arrays to see if an update is needed to avoid unnecessary writes
+            const originalOrder = materialsReportToLoad.locations.map((l: MaterialLocation) => l.name.trim()).join(',');
+            const newOrder = sortedAndSyncedLocations.map(l => l.name.trim()).join(',');
+
+            if (originalOrder !== newOrder || materialsReportToLoad.locations.length !== sortedAndSyncedLocations.length) {
+                materialsReportToLoad.locations = sortedAndSyncedLocations;
+                localStorage.setItem('materialsData', JSON.stringify(materialsReportToLoad));
+            }
         }
           
         setSchedule(dataCopy);
@@ -580,7 +609,7 @@ const App: React.FC = () => {
         if (window.confirm("¿Está seguro de que desea reemplazar todo el reporte de unidades con los datos de este archivo? Esta acción no se puede deshacer.")) {
             try {
                 const fileBuffer = await file.arrayBuffer();
-                const newUnitReportData = parseFullUnitReportFromExcel(fileBuffer); 
+                const newUnitReportData = await parseFullUnitReportFromExcel(fileBuffer); 
                 
                 if (newUnitReportData) {
                     handleUpdateUnitReport(newUnitReportData);

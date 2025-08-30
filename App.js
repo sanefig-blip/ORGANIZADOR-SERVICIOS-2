@@ -11,7 +11,7 @@ import { servicePersonnelData as defaultServicePersonnel } from './data/serviceP
 import { defaultUnits } from './data/unitData.js';
 import { defaultServiceTemplates } from './data/serviceTemplates.js';
 import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.js';
-import { parseScheduleFromFile, parseUnitReportFromExcel } from './services/wordImportService.js';
+import { parseScheduleFromFile, parseFullUnitReportFromExcel } from './services/wordImportService.js';
 import ScheduleDisplay from './components/ScheduleDisplay.js';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.js';
 import Nomenclador from './components/Nomenclador.js';
@@ -197,6 +197,34 @@ const App = () => {
         } catch (e) {
             console.error("Failed to load or parse Materials report data, falling back to default.", e);
             materialsReportToLoad = preloadedMaterialsData;
+        }
+        
+        if (unitReportToLoad && materialsReportToLoad) {
+            const unitReportOrder = unitReportToLoad.zones.flatMap(zone => 
+                zone.groups.map(group => group.name.trim())
+            );
+
+            const materialsMap = new Map(
+                materialsReportToLoad.locations.map(loc => [loc.name.trim(), loc])
+            );
+
+            const sortedAndSyncedLocations = [];
+            
+            unitReportOrder.forEach(name => {
+                if (materialsMap.has(name)) {
+                    sortedAndSyncedLocations.push(materialsMap.get(name));
+                } else {
+                    sortedAndSyncedLocations.push({ name: name, materials: [] });
+                }
+            });
+
+            const originalOrder = materialsReportToLoad.locations.map(l => l.name.trim()).join(',');
+            const newOrder = sortedAndSyncedLocations.map(l => l.name.trim()).join(',');
+
+            if (originalOrder !== newOrder || materialsReportToLoad.locations.length !== sortedAndSyncedLocations.length) {
+                materialsReportToLoad.locations = sortedAndSyncedLocations;
+                localStorage.setItem('materialsData', JSON.stringify(materialsReportToLoad));
+            }
         }
           
         setSchedule(dataCopy);
@@ -575,40 +603,31 @@ const App = () => {
 
     const handleUnitReportImport = async (event) => {
         const file = event.target.files?.[0];
-        if (!file || !unitReport) return;
-        try {
-            const fileBuffer = await file.arrayBuffer();
-            const importedData = parseUnitReportFromExcel(fileBuffer);
+        if (!file) return;
 
-            if (importedData) {
-                const { stationName, units } = importedData;
+        if (window.confirm("¿Está seguro de que desea reemplazar todo el reporte de unidades con los datos de este archivo? Esta acción no se puede deshacer.")) {
+            try {
+                const fileBuffer = await file.arrayBuffer();
+                const newUnitReportData = await parseFullUnitReportFromExcel(fileBuffer); 
                 
-                const reportCopy = JSON.parse(JSON.stringify(unitReport));
-                let stationUpdated = false;
-
-                for (const zone of reportCopy.zones) {
-                    const group = zone.groups.find(g => g.name.toUpperCase() === stationName.toUpperCase());
-                    if (group) {
-                        group.units = units;
-                        stationUpdated = true;
-                        break;
-                    }
-                }
-                
-                if (stationUpdated) {
-                    handleUpdateUnitReport(reportCopy);
-                    showToast(`Reporte de unidades para "${stationName}" importado con éxito.`);
+                if (newUnitReportData) {
+                    handleUpdateUnitReport(newUnitReportData);
+                    showToast("Reporte de unidades importado y reemplazado con éxito.");
                 } else {
-                    alert(`No se encontró la estación "${stationName}" en el reporte actual.`);
+                    alert("No se pudo procesar el archivo Excel. Verifique el formato del reporte completo.");
                 }
-            } else {
-                alert("No se pudo procesar el archivo Excel. Verifique el formato.");
+            } catch (error) {
+                console.error("Error al importar el reporte de unidades:", error);
+                alert(`Hubo un error al procesar el archivo Excel: ${error.message}`);
+            } finally {
+                if (unitReportFileInputRef.current) {
+                    unitReportFileInputRef.current.value = '';
+                }
             }
-        } catch (error) {
-            console.error("Error al importar el reporte de unidades:", error);
-            alert("Hubo un error al procesar el archivo Excel.");
-        } finally {
-            if (unitReportFileInputRef.current) unitReportFileInputRef.current.value = '';
+        } else {
+             if (unitReportFileInputRef.current) {
+                unitReportFileInputRef.current.value = '';
+            }
         }
     };
 
@@ -819,19 +838,15 @@ const App = () => {
                                 isImportMenuOpen && (
                                     React.createElement("div", { className: "absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                         React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical" },
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                             React.createElement("button", { type: "button", onClick: () => { fileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Horario (Word/Excel)"
                                             ),
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                             React.createElement("button", { type: "button", onClick: () => { unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
                                             ),
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                             React.createElement("button", { type: "button", onClick: () => { setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"
                                             ),
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                             React.createElement("button", { type: "button", onClick: () => { openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(BookmarkIcon, { className: 'w-4 h-4' }), " Añadir desde Plantilla"
                                             )
@@ -848,13 +863,10 @@ const App = () => {
                                 ),
                                 isExportMenuOpen && React.createElement("div", { className: "absolute right-0 mt-2 w-56 origin-top-right rounded-md shadow-lg bg-zinc-700 ring-1 ring-black ring-opacity-5 z-50 animate-scale-in" },
                                     React.createElement("div", { className: "py-1", role: "menu", "aria-orientation": "vertical", "aria-labelledby": "options-menu" },
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                         React.createElement("button", { type: "button", onClick: () => { exportScheduleToWord({ ...schedule, date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar General"),
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                         React.createElement("button", { type: "button", onClick: () => { exportScheduleByTimeToWord({ date: displayDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase(), assignmentsByTime: getAssignmentsByTime }); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar por Hora"),
-// FIX: Changed <a> to <button> for accessibility and to resolve type error.
                                         React.createElement("button", { type: "button", onClick: () => { setIsExportTemplateModalOpen(true); setExportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                             React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Exportar Plantilla")
                                     )
