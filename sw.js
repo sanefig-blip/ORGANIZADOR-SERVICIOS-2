@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fire-dept-organizer-cache-v5';
+const CACHE_NAME = 'fire-dept-organizer-cache-v16';
 const urlsToCache = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const urlsToCache = [
   './components/CommandPostView.js',
   './components/EraReportDisplay.js',
   './components/GeneratorReportDisplay.js',
+  './components/Croquis.js',
   './services/geminiService.js',
   './services/exportService.js',
   './services/wordImportService.js',
@@ -33,12 +34,18 @@ const urlsToCache = [
   './data/unitReportData.js',
   './data/eraData.js',
   './data/generatorData.js',
+  './data/streets.js',
   'https://cdn.tailwindcss.com',
   'https://esm.sh/docx@8.5.0',
   'https://esm.sh/xlsx@0.18.5',
   'https://esm.sh/mammoth@1.8.0',
   'https://esm.sh/react@^19.1.1',
   'https://esm.sh/react-dom@^19.1.1/client',
+  'https://esm.sh/jspdf@2.5.1',
+  'https://esm.sh/jspdf-autotable@3.8.2',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -58,6 +65,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // For requests to esm.sh, unpkg, or cdnjs try network first, then cache.
+  if (event.request.url.startsWith('https://esm.sh/') || event.request.url.startsWith('https://unpkg.com/') || event.request.url.startsWith('https://cdnjs.cloudflare.com/')) {
+    event.respondWith(
+      fetch(event.request).then(networkResponse => {
+        if (networkResponse.ok) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // For all other requests, use cache-first strategy.
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -65,10 +91,8 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-            if(networkResponse.type !== 'opaque') {
-                return networkResponse;
-            }
+        if (!networkResponse || networkResponse.status !== 200) {
+           return networkResponse;
         }
 
         const responseToCache = networkResponse.clone();

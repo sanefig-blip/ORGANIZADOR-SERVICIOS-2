@@ -183,3 +183,48 @@ export const LightningBoltIcon = ({ className }) => (
         React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 10V3L4 14h7v7l9-11h-7z" })
     )
 );
+
+export const MapIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 16.382V5.618a1 1 0 00-.553-.894L15 2m-6 5l6-3m0 0l6 3m-6-3v10" })
+    )
+);
+
+export const ClipboardCopyIcon = ({ className }) => (
+  React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+    React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" })
+  )
+);
+
+export const EngineIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
+        React.createElement("path", { d: "M19.5,8c-0.28,0-0.5,0.22-0.5,0.5v1.5H5v-1.5C5,8.22,4.78,8,4.5,8S4,8.22,4,8.5v2C4,11.22,4.22,11.5,4.5,11.5h15 c0.28,0,0.5-0.22,0.5-0.5v-2C20,8.22,19.78,8,19.5,8z M18,12H6c-1.1,0-2,0.9-2,2v2h2v-2h12v2h2v-2C20,12.9,19.1,12,18,12z M7.5,15 C6.67,15,6,15.67,6,16.5S6.67,18,7.5,18S9,17.33,9,16.5S8.33,15,7.5,15z M16.5,15c-0.83,0-1.5,0.67-1.5,1.5s0.67,1.5,1.5,1.5 s1.5-0.67,1.5-1.5S17.33,15,16.5,15z" }),
+        React.createElement("path", { d: "M18.92,3.01C18.72,2.42,18.16,2,17.5,2H7.21c-0.53,0-1.02,0.3-1.28,0.77L4,5.12V7h16V5.12L18.92,3.01z M7.28,4h9.44l0.71,1H6.57L7.28,4z" })
+    )
+);
+
+export const LadderIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
+        React.createElement("path", { d: "M22 6.13l-1-1-3 3-1-1-3 3-1-1-3 3-1-1-3 3-1-1-2.13 2.13 1 1 3-3 1 1 3-3 1 1 3-3 1 1 3-3 1 1 .13-.13zM4 17h16v-2H4v2z" })
+    )
+);
+
+export const AmbulanceIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
+        React.createElement("path", { d: "M19 8h-1V6c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v2H5c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h1v1c0 .55.45 1 1 1s1-.45 1-1v-1h8v1c0 .55.45 1 1 1s1-.45 1-1v-1h1c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2zM8 6h8v2H8V6zm11 10H5v-4h14v4z" }),
+        React.createElement("path", { d: "M11 11h2v4h-2z" }),
+        React.createElement("path", { d: "M9 13h6v-2H9z" })
+    )
+);
+
+export const CommandPostIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
+        React.createElement("path", { d: "M12 2L2 7v13h20V7L12 2zm0 2.311L18.6 7H5.4L12 4.311zM4 9h16v10H4V9zm8 1l-4 4h3v4h2v-4h3l-4-4z" })
+    )
+);
+
+export const PersonIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
+        React.createElement("path", { d: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" })
+    )
+);

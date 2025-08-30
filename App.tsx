@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
@@ -21,7 +19,7 @@ import UnitStatusView from './components/UnitStatusView.tsx';
 import CommandPostView from './components/CommandPostView.tsx';
 import EraReportDisplay from './components/EraReportDisplay.tsx';
 import GeneratorReportDisplay from './components/GeneratorReportDisplay.tsx';
-import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.tsx';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';

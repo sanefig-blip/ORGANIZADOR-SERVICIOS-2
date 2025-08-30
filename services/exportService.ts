@@ -1,9 +1,8 @@
-
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType, UnderlineType, AlignmentType, ShadingType, PageBreak } from 'docx';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit } from '../types';
+import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit, SCI201Data, SCI211Resource, SCI207Victim } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -652,12 +651,22 @@ export const exportUnitStatusToPdf = (filteredUnits: (FireUnit & { groupName: st
     doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
 };
 
-export const exportCommandPostToPdf = (incidentDetails: any, trackedUnits: any[], trackedPersonnel: any[]) => {
+export const exportCommandPostToPdf = (
+    incidentDetails: any, 
+    trackedUnits: any[], 
+    trackedPersonnel: any[],
+    sci201Data: SCI201Data,
+    sci211Data: SCI211Resource[],
+    sci207Data: SCI207Victim[],
+    croquisSketch: string | null
+) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
     const margin = 14;
     let y = 15;
 
+    // --- Page 1: General Info ---
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text("Reporte de Puesto de Comando", pageWidth / 2, y, { align: 'center' });
@@ -691,9 +700,102 @@ export const exportCommandPostToPdf = (incidentDetails: any, trackedUnits: any[]
         trackedPersonnel.filter(p => p.onScene).map(p => [
             p.name, p.type, p.groupName, p.notes
         ]), y);
+        
+    // --- SCI-201 Page ---
+    doc.addPage();
+    y = 15;
+    doc.setFontSize(16);
+    doc.text("Formulario SCI-201: Resumen del Incidente", pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    autoTable(doc, {
+        startY: y,
+        theme: 'plain',
+        styles: { fontSize: 9, cellPadding: 1.5, lineColor: 200 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+        body: [
+            ['Nombre del Incidente', sci201Data.incidentName || '-'],
+            ['Fecha/Hora de Preparación', sci201Data.prepDateTime || '-'],
+            ['Lugar del Incidente', sci201Data.incidentLocation || '-'],
+            ['Naturaleza del Incidente', sci201Data.evalNature || '-'],
+            ['Amenazas', sci201Data.evalThreats || '-'],
+            ['Área Afectada', sci201Data.evalAffectedArea || '-'],
+            ['Aislamiento', sci201Data.evalIsolation || '-'],
+            ['Objetivo(s) Inicial(es)', sci201Data.initialObjectives || '-'],
+            ['Estrategias', sci201Data.strategies || '-'],
+            ['Tácticas', sci201Data.tactics || '-'],
+            ['Ubicación del PC', sci201Data.pcLocation || '-'],
+            ['Ruta Ingreso/Egreso', `${sci201Data.ingressRoute || '-'} / ${sci201Data.egressRoute || '-'}`],
+            ['Mensaje de Seguridad', sci201Data.safetyMessage || '-'],
+            ['Comandante del Incidente', sci201Data.incidentCommander || '-'],
+        ]
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+    y = createPdfTable(doc, 'Resumen de Acciones', ['Hora', 'Resumen'], sci201Data.actions.map(a => [a.time, a.summary]), y);
     
-    doc.save(`Puesto_Comando_${new Date().toISOString().split('T')[0]}.pdf`);
+    // --- SCI-211 Page ---
+    if (sci211Data.filter(r => r.requestedBy).length > 0) {
+        doc.addPage();
+        y = 15;
+        doc.setFontSize(16);
+        doc.text("Formulario SCI-211: Registro de Recursos", pageWidth / 2, y, { align: 'center' });
+        y += 10;
+        autoTable(doc, {
+            startY: y,
+            theme: 'grid',
+            head: [['Solicitado por', 'F/H Sol.', 'Recurso', 'Institución', 'F/H Arribo', 'Asignado a', 'F/H Desmov.']],
+            body: sci211Data.filter(r => r.requestedBy).map(r => [
+                r.requestedBy, r.requestDateTime, `${r.classType} / ${r.resourceType}`, r.institution, r.arrivalDateTime, r.assignedTo, r.demobilizedDateTime
+            ]),
+            styles: { fontSize: 8 }
+        });
+    }
+
+    // --- SCI-207 Page ---
+    if (sci207Data.filter(v => v.patientName).length > 0) {
+        doc.addPage();
+        y = 15;
+        doc.setFontSize(16);
+        doc.text("Formulario SCI-207: Registro de Víctimas", pageWidth / 2, y, { align: 'center' });
+        y += 10;
+        autoTable(doc, {
+            startY: y,
+            theme: 'grid',
+            head: [['Paciente', 'Sexo/Edad', 'Clasif.', 'Lugar Traslado', 'Trasladado por', 'F/H Traslado']],
+            body: sci207Data.filter(v => v.patientName).map(v => [
+                v.patientName, `${v.sex}/${v.age}`, v.triage, v.transportLocation, v.transportedBy, v.transportDateTime
+            ])
+        });
+    }
+
+    // --- Croquis Page ---
+    if (croquisSketch) {
+        doc.addPage();
+        y = 15;
+        doc.setFontSize(16);
+        doc.text("Croquis del Incidente", pageWidth / 2, y, { align: 'center' });
+        y += 10;
+        
+        try {
+            const img = new Image();
+            img.src = croquisSketch;
+            const imgProps = doc.getImageProperties(croquisSketch);
+            const imgWidth = pageWidth - (margin * 2);
+            const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+            const finalHeight = Math.min(imgHeight, pageHeight - y - margin);
+            const finalWidth = (finalHeight * imgProps.width) / imgProps.height;
+            const xPos = (pageWidth - finalWidth) / 2;
+
+            doc.addImage(croquisSketch, 'PNG', xPos, y, finalWidth, finalHeight);
+        } catch (error) {
+            console.error("Error adding image to PDF:", error);
+            doc.setTextColor(255, 0, 0);
+            doc.text("No se pudo cargar el croquis.", margin, y);
+        }
+    }
+    
+    doc.save(`Reporte_Puesto_Comando_${new Date().toISOString().split('T')[0]}.pdf`);
 };
+
 
 export const exportPersonnelToExcel = (personnel: Personnel[], title: string) => {
     const data = personnel.map(p => ({

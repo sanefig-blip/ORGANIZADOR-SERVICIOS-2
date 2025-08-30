@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { UnitReportData, SCI201Data, SCI211Resource, SCI207Victim, TriageCategory } from '../types';
-import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon, DownloadIcon } from './icons';
+import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons';
 import { exportCommandPostToPdf } from '../services/exportService';
+import Croquis from './Croquis';
 
 interface TrackedUnit {
   id: string;
@@ -25,26 +25,6 @@ interface TrackedPersonnel {
     onScene: boolean;
     notes: string;
 }
-
-const initialIncidentDetails = {
-    type: '',
-    address: '',
-    district: '',
-    alarmTime: new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }).replace(',', ''),
-    chiefOnScene: '',
-    incidentCommander: '',
-    remarks: ''
-};
-
-const initialSci201Data: SCI201Data = {
-    incidentName: '', prepDateTime: '', incidentLocation: '',
-    evalNature: '', evalThreats: '', evalAffectedArea: '', evalIsolation: '',
-    initialObjectives: '', strategies: '', tactics: '',
-    pcLocation: '', eLocation: '', ingressRoute: '', egressRoute: '',
-    safetyMessage: '', incidentCommander: '',
-    mapOrSketch: '', orgChart: '',
-    actions: [{ id: Date.now(), time: '', summary: '' }]
-};
 
 const FormInput = ({ label, name, value, onChange }: { label: string, name: string, value: string, onChange: (e: any) => void }) => (
     <div>
@@ -69,53 +49,77 @@ const TabButton = ({ activeTab, tabName, label, onClick }: { activeTab: string, 
     </button>
 );
 
+interface CommandPostViewProps {
+    unitReportData: UnitReportData;
+}
 
-const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitReportData }) => {
+const CommandPostView: React.FC<CommandPostViewProps> = ({ unitReportData }) => {
     const [activeTab, setActiveTab] = useState('control');
-    const [incidentDetails, setIncidentDetails] = useState(initialIncidentDetails);
-    const [trackedUnits, setTrackedUnits] = useState<TrackedUnit[]>([]);
-    const [trackedPersonnel, setTrackedPersonnel] = useState<TrackedPersonnel[]>([]);
-    const [resetKey, setResetKey] = useState(0);
+    const [croquisSketch, setCroquisSketch] = useState<string | null>(null);
 
-    // State for SCI Forms
-    const [sci201Data, setSci201Data] = useState<SCI201Data>(initialSci201Data);
-    const [sci211Resources, setSci211Resources] = useState<SCI211Resource[]>([]);
-    const [sci207Victims, setSci207Victims] = useState<SCI207Victim[]>([]);
-    
-    useEffect(() => {
-        const serviceUnits = unitReportData.zones.flatMap(zone =>
-            zone.groups.flatMap(group =>
-                group.units
-                    .filter(unit => unit.status.toLowerCase().includes('para servicio'))
-                    .map(unit => ({
-                        ...unit,
-                        groupName: group.name,
-                        dispatched: false,
-                        departureTime: '',
-                        onSceneTime: '',
-                        returnTime: '',
-                        notes: ''
-                    }))
-            )
-        );
-        setTrackedUnits(serviceUnits);
-
-        const keyPersonnel = unitReportData.zones.flatMap(zone =>
-            zone.groups.flatMap(group =>
-                [
-                    ...(group.crewOfficers || []).map(name => ({ type: 'Dotación' as const, name, groupName: group.name })),
-                    ...(group.standbyOfficers || []).map(name => ({ type: 'Apresto' as const, name, groupName: group.name }))
-                ].map(p => ({
-                    ...p,
-                    id: `${p.groupName}-${p.name}`,
-                    onScene: false,
+    const allUnitsForTracking = useMemo(() => {
+        if (!unitReportData) return [];
+        return unitReportData.zones.flatMap(zone => 
+            zone.groups.flatMap(group => 
+                group.units.map(unit => ({
+                    ...unit,
+                    groupName: group.name,
+                    dispatched: false,
+                    departureTime: '',
+                    onSceneTime: '',
+                    returnTime: '',
                     notes: ''
                 }))
             )
         );
-        setTrackedPersonnel(keyPersonnel);
+    }, [unitReportData]);
+    const [trackedUnits, setTrackedUnits] = useState<TrackedUnit[]>(allUnitsForTracking);
+
+    useEffect(() => {
+        setTrackedUnits(allUnitsForTracking);
+    }, [allUnitsForTracking]);
+
+    const allPersonnelForTracking = useMemo(() => {
+        if (!unitReportData) return [];
+        const personnelMap = new Map<string, any>();
         
-    }, [unitReportData, resetKey]);
+        unitReportData.zones.forEach(zone => {
+            zone.groups.forEach(group => {
+                (group.crewOfficers || []).forEach(officerName => {
+                    if (!personnelMap.has(officerName)) {
+                        personnelMap.set(officerName, { id: officerName, name: officerName, type: 'Dotación', groupName: group.name, onScene: false, notes: '' });
+                    }
+                });
+                (group.standbyOfficers || []).forEach(officerName => {
+                    if (!personnelMap.has(officerName)) {
+                        personnelMap.set(officerName, { id: officerName, name: officerName, type: 'Apresto', groupName: group.name, onScene: false, notes: '' });
+                    }
+                });
+            });
+        });
+        return Array.from(personnelMap.values());
+    }, [unitReportData]);
+    const [trackedPersonnel, setTrackedPersonnel] = useState<TrackedPersonnel[]>(allPersonnelForTracking);
+    useEffect(() => {
+        setTrackedPersonnel(allPersonnelForTracking);
+    }, [allPersonnelForTracking]);
+
+    const [incidentDetails, setIncidentDetails] = useState({ type: '', address: '', district: '', alarmTime: '', chiefOnScene: '', incidentCommander: '' });
+    const [sci201Data, setSci201Data] = useState<SCI201Data>({
+        incidentName: '', prepDateTime: '', incidentLocation: '', evalNature: '', evalThreats: '',
+        evalAffectedArea: '', evalIsolation: '', initialObjectives: '', strategies: '', tactics: '',
+        pcLocation: '', eLocation: '', ingressRoute: '', egressRoute: '', safetyMessage: '',
+        incidentCommander: '', mapOrSketch: '', orgChart: '', actions: [{id: 1, time: '', summary: ''}]
+    });
+    const [sci211Resources, setSci211Resources] = useState<SCI211Resource[]>([{
+        id: 1, requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '',
+        institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '',
+        demobilizedBy: '', demobilizedDateTime: '', observations: ''
+    }]);
+    const [sci207Victims, setSci207Victims] = useState<SCI207Victim[]>([{
+        id: 1, patientName: '', sex: '', age: '', triage: '', transportLocation: '',
+        transportedBy: '', transportDateTime: ''
+    }]);
 
     const handleIncidentDetailChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -123,72 +127,70 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
     };
 
     const handleUnitTrackChange = (unitId: string, field: keyof TrackedUnit, value: any) => {
-        setTrackedUnits(prev =>
-            prev.map(unit =>
-                unit.id === unitId ? { ...unit, [field]: value } : unit
-            )
-        );
+        setTrackedUnits(prev => prev.map(u => u.id === unitId ? { ...u, [field]: value } : u));
     };
     
     const handlePersonnelTrackChange = (personnelId: string, field: keyof TrackedPersonnel, value: any) => {
-        setTrackedPersonnel(prev =>
-            prev.map(person =>
-                person.id === personnelId ? { ...person, [field]: value } : person
-            )
-        );
+        setTrackedPersonnel(prev => prev.map(p => p.id === personnelId ? { ...p, [field]: value } : p));
     };
 
-    const handleReset = () => {
-        if (window.confirm("¿Está seguro de que desea limpiar todos los datos de la intervención? Esta acción no se puede deshacer.")) {
-            setIncidentDetails(initialIncidentDetails);
-            setSci201Data(initialSci201Data);
-            setSci211Resources([]);
-            setSci207Victims([]);
-            setResetKey(prev => prev + 1);
-        }
-    };
-
-    // --- Handlers for SCI 201 ---
     const handleSci201Change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setSci201Data(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setSci201Data(prev => ({...prev, [name]: value}));
     };
+
     const handleSci201ActionChange = (id: number, field: 'time' | 'summary', value: string) => {
         setSci201Data(prev => ({
             ...prev,
-            actions: prev.actions.map(action => action.id === id ? { ...action, [field]: value } : action)
+            actions: prev.actions.map(a => a.id === id ? {...a, [field]: value} : a)
         }));
     };
+
     const addSci201Action = () => {
-        setSci201Data(prev => ({ ...prev, actions: [...prev.actions, { id: Date.now(), time: '', summary: '' }] }));
+        setSci201Data(prev => ({
+            ...prev,
+            actions: [...prev.actions, {id: Date.now(), time: '', summary: ''}]
+        }));
     };
+
     const removeSci201Action = (id: number) => {
-        setSci201Data(prev => ({ ...prev, actions: prev.actions.filter(action => action.id !== id) }));
+        setSci201Data(prev => ({
+            ...prev,
+            actions: prev.actions.filter(a => a.id !== id)
+        }));
     };
-
-    // --- Handlers for SCI 211 ---
+    
     const handleSci211Change = (id: number, field: keyof SCI211Resource, value: any) => {
-        setSci211Resources(prev => prev.map(res => res.id === id ? { ...res, [field]: value } : res));
+        setSci211Resources(prev => prev.map(r => r.id === id ? {...r, [field]: value} : r));
     };
+
     const addSci211Resource = () => {
-        const newResource: SCI211Resource = { id: Date.now(), requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '', institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '', demobilizedBy: '', demobilizedDateTime: '', observations: '' };
-        setSci211Resources(prev => [...prev, newResource]);
+        setSci211Resources(prev => [...prev, {
+            id: Date.now(), requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '',
+            institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '',
+            demobilizedBy: '', demobilizedDateTime: '', observations: ''
+        }]);
     };
+
     const removeSci211Resource = (id: number) => {
-        setSci211Resources(prev => prev.filter(res => res.id !== id));
+        setSci211Resources(prev => prev.filter(r => r.id !== id));
     };
-
-    // --- Handlers for SCI 207 ---
+    
     const handleSci207Change = (id: number, field: keyof SCI207Victim, value: any) => {
-        setSci207Victims(prev => prev.map(vic => vic.id === id ? { ...vic, [field]: value } : vic));
-    };
-    const addSci207Victim = () => {
-        const newVictim: SCI207Victim = { id: Date.now(), patientName: '', sex: '', age: '', triage: '', transportLocation: '', transportedBy: '', transportDateTime: '' };
-        setSci207Victims(prev => [...prev, newVictim]);
-    };
-    const removeSci207Victim = (id: number) => {
-        setSci207Victims(prev => prev.filter(vic => vic.id !== id));
+        setSci207Victims(prev => prev.map(v => v.id === id ? {...v, [field]: value} : v));
     };
 
+    const addSci207Victim = () => {
+        setSci207Victims(prev => [...prev, {
+            id: Date.now(), patientName: '', sex: '', age: '', triage: '', transportLocation: '',
+            transportedBy: '', transportDateTime: ''
+        }]);
+    };
+
+    const removeSci207Victim = (id: number) => {
+        setSci207Victims(prev => prev.filter(v => v.id !== id));
+    };
+    
     const triageColors: {[key in TriageCategory]: string} = {
         'Rojo': 'bg-red-600 text-white',
         'Amarillo': 'bg-yellow-500 text-black',
@@ -197,38 +199,38 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
         '': 'bg-zinc-600 text-white'
     };
 
-    return (
-        <div className="animate-fade-in space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-center bg-zinc-800/60 p-4 rounded-xl gap-4">
-                <div className="flex items-center gap-4">
-                    <AnnotationIcon className="w-8 h-8 text-yellow-300"/>
-                    <h2 className="text-2xl lg:text-3xl font-bold text-white">Puesto de Comando - Control de Intervención</h2>
-                </div>
-                 <div className="flex-shrink-0 flex items-center gap-2">
-                    <button onClick={() => exportCommandPostToPdf(incidentDetails, trackedUnits, trackedPersonnel)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-md transition-colors">
-                        <DownloadIcon className="w-5 h-5"/>
-                        Generar Reporte
-                    </button>
-                    <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors">
-                        <RefreshIcon className="w-5 h-5"/>
-                        Limpiar Hoja
-                    </button>
-                </div>
-            </div>
+    const handleExport = () => {
+        exportCommandPostToPdf(
+            incidentDetails,
+            trackedUnits,
+            trackedPersonnel,
+            sci201Data,
+            sci211Resources,
+            sci207Victims,
+            croquisSketch
+        );
+    };
 
-            <div className="bg-zinc-800/60 p-2 rounded-xl">
+    return (
+        <div className="space-y-6">
+            <div className="bg-zinc-800/60 p-2 rounded-xl flex items-center justify-between">
                 <div className="flex flex-wrap gap-2">
                     <TabButton activeTab={activeTab} tabName="control" label="Control General" onClick={setActiveTab} />
+                    <TabButton activeTab={activeTab} tabName="croquis" label="Croquis Táctico" onClick={setActiveTab} />
                     <TabButton activeTab={activeTab} tabName="sci201" label="Formulario SCI-201 (Resumen)" onClick={setActiveTab} />
                     <TabButton activeTab={activeTab} tabName="sci211" label="Formulario SCI-211 (Recursos)" onClick={setActiveTab} />
                     <TabButton activeTab={activeTab} tabName="sci207" label="Formulario SCI-207 (Víctimas)" onClick={setActiveTab} />
                 </div>
+                 <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold">
+                    <DownloadIcon className="w-5 h-5"/>
+                    Exportar Reporte PDF
+                </button>
             </div>
 
             {activeTab === 'control' && (
-                <div className="space-y-6">
+                <div className="space-y-6 animate-fade-in">
                     <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4">
-                        <h3 className="text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2">Datos Generales del Siniestro</h3>
+                        <h3 className="text-xl font-semibold text-yellow-300">Datos Generales del Siniestro</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <FormInput label="Tipo de Siniestro" name="type" value={incidentDetails.type} onChange={handleIncidentDetailChange} />
                             <FormInput label="Dirección" name="address" value={incidentDetails.address} onChange={handleIncidentDetailChange} />
@@ -305,9 +307,15 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
                     </div>
                 </div>
             )}
+
+            {activeTab === 'croquis' && (
+                <div className="animate-fade-in">
+                    <Croquis onSketchChange={setCroquisSketch} />
+                </div>
+            )}
             
             {activeTab === 'sci201' && (
-                <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4">
+                <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in">
                     <h3 className="text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2">Formulario SCI-201: Resumen del Incidente</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormInput label="1. Nombre del Incidente" name="incidentName" value={sci201Data.incidentName} onChange={handleSci201Change} />
@@ -355,7 +363,7 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
             )}
             
             {activeTab === 'sci211' && (
-                 <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4">
+                 <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in">
                     <h3 className="text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2 mb-4">Formulario SCI-211: Registro y Control de Recursos</h3>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left min-w-[1200px] text-sm">
@@ -402,7 +410,7 @@ const CommandPostView: React.FC<{ unitReportData: UnitReportData }> = ({ unitRep
             )}
             
             {activeTab === 'sci207' && (
-                <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4">
+                <div className="bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in">
                     <h3 className="text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2 mb-4">Formulario SCI-207: Registro de Víctimas</h3>
                      <div className="overflow-x-auto">
                         <table className="w-full text-left min-w-[1000px] text-sm">

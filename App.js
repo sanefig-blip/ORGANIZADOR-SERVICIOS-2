@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
@@ -21,7 +19,7 @@ import UnitStatusView from './components/UnitStatusView.js';
 import CommandPostView from './components/CommandPostView.js';
 import EraReportDisplay from './components/EraReportDisplay.js';
 import GeneratorReportDisplay from './components/GeneratorReportDisplay.js';
-import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon } from './components/icons.js';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon } from './components/icons.js';
 import HelpModal from './components/HelpModal.js';
 import RosterImportModal from './components/RosterImportModal.js';
 import ServiceTemplateModal from './components/ServiceTemplateModal.js';

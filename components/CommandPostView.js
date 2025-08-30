@@ -1,27 +1,7 @@
-
-import React, { useState, useEffect } from 'react';
-import { RefreshIcon, AnnotationIcon, PlusCircleIcon, TrashIcon, DownloadIcon } from './icons.js';
+import React, { useState, useMemo, useEffect } from 'react';
+import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons.js';
 import { exportCommandPostToPdf } from '../services/exportService.js';
-
-const initialIncidentDetails = {
-    type: '',
-    address: '',
-    district: '',
-    alarmTime: new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }).replace(',', ''),
-    chiefOnScene: '',
-    incidentCommander: '',
-    remarks: ''
-};
-
-const initialSci201Data = {
-    incidentName: '', prepDateTime: '', incidentLocation: '',
-    evalNature: '', evalThreats: '', evalAffectedArea: '', evalIsolation: '',
-    initialObjectives: '', strategies: '', tactics: '',
-    pcLocation: '', eLocation: '', ingressRoute: '', egressRoute: '',
-    safetyMessage: '', incidentCommander: '',
-    mapOrSketch: '', orgChart: '',
-    actions: [{ id: Date.now(), time: '', summary: '' }]
-};
+import Croquis from './Croquis.js';
 
 const FormInput = ({ label, name, value, onChange }) => (
     React.createElement("div", null,
@@ -46,53 +26,73 @@ const TabButton = ({ activeTab, tabName, label, onClick }) => (
     )
 );
 
-
 const CommandPostView = ({ unitReportData }) => {
     const [activeTab, setActiveTab] = useState('control');
-    const [incidentDetails, setIncidentDetails] = useState(initialIncidentDetails);
-    const [trackedUnits, setTrackedUnits] = useState([]);
-    const [trackedPersonnel, setTrackedPersonnel] = useState([]);
-    const [resetKey, setResetKey] = useState(0);
+    const [croquisSketch, setCroquisSketch] = useState(null);
 
-    // State for SCI Forms
-    const [sci201Data, setSci201Data] = useState(initialSci201Data);
-    const [sci211Resources, setSci211Resources] = useState([]);
-    const [sci207Victims, setSci207Victims] = useState([]);
-    
-    useEffect(() => {
-        const serviceUnits = unitReportData.zones.flatMap(zone =>
-            zone.groups.flatMap(group =>
-                group.units
-                    .filter(unit => unit.status.toLowerCase().includes('para servicio'))
-                    .map(unit => ({
-                        ...unit,
-                        groupName: group.name,
-                        dispatched: false,
-                        departureTime: '',
-                        onSceneTime: '',
-                        returnTime: '',
-                        notes: ''
-                    }))
-            )
-        );
-        setTrackedUnits(serviceUnits);
-
-        const keyPersonnel = unitReportData.zones.flatMap(zone =>
-            zone.groups.flatMap(group =>
-                [
-                    ...(group.crewOfficers || []).map(name => ({ type: 'Dotación', name, groupName: group.name })),
-                    ...(group.standbyOfficers || []).map(name => ({ type: 'Apresto', name, groupName: group.name }))
-                ].map(p => ({
-                    ...p,
-                    id: `${p.groupName}-${p.name}`,
-                    onScene: false,
+    const allUnitsForTracking = useMemo(() => {
+        if (!unitReportData) return [];
+        return unitReportData.zones.flatMap(zone => 
+            zone.groups.flatMap(group => 
+                group.units.map(unit => ({
+                    ...unit,
+                    groupName: group.name,
+                    dispatched: false,
+                    departureTime: '',
+                    onSceneTime: '',
+                    returnTime: '',
                     notes: ''
                 }))
             )
         );
-        setTrackedPersonnel(keyPersonnel);
+    }, [unitReportData]);
+    const [trackedUnits, setTrackedUnits] = useState(allUnitsForTracking);
+
+    useEffect(() => {
+        setTrackedUnits(allUnitsForTracking);
+    }, [allUnitsForTracking]);
+
+    const allPersonnelForTracking = useMemo(() => {
+        if (!unitReportData) return [];
+        const personnelMap = new Map();
         
-    }, [unitReportData, resetKey]);
+        unitReportData.zones.forEach(zone => {
+            zone.groups.forEach(group => {
+                (group.crewOfficers || []).forEach(officerName => {
+                    if (!personnelMap.has(officerName)) {
+                        personnelMap.set(officerName, { id: officerName, name: officerName, type: 'Dotación', groupName: group.name, onScene: false, notes: '' });
+                    }
+                });
+                (group.standbyOfficers || []).forEach(officerName => {
+                    if (!personnelMap.has(officerName)) {
+                        personnelMap.set(officerName, { id: officerName, name: officerName, type: 'Apresto', groupName: group.name, onScene: false, notes: '' });
+                    }
+                });
+            });
+        });
+        return Array.from(personnelMap.values());
+    }, [unitReportData]);
+    const [trackedPersonnel, setTrackedPersonnel] = useState(allPersonnelForTracking);
+    useEffect(() => {
+        setTrackedPersonnel(allPersonnelForTracking);
+    }, [allPersonnelForTracking]);
+
+    const [incidentDetails, setIncidentDetails] = useState({ type: '', address: '', district: '', alarmTime: '', chiefOnScene: '', incidentCommander: '' });
+    const [sci201Data, setSci201Data] = useState({
+        incidentName: '', prepDateTime: '', incidentLocation: '', evalNature: '', evalThreats: '',
+        evalAffectedArea: '', evalIsolation: '', initialObjectives: '', strategies: '', tactics: '',
+        pcLocation: '', eLocation: '', ingressRoute: '', egressRoute: '', safetyMessage: '',
+        incidentCommander: '', mapOrSketch: '', orgChart: '', actions: [{id: 1, time: '', summary: ''}]
+    });
+    const [sci211Resources, setSci211Resources] = useState([{
+        id: 1, requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '',
+        institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '',
+        demobilizedBy: '', demobilizedDateTime: '', observations: ''
+    }]);
+    const [sci207Victims, setSci207Victims] = useState([{
+        id: 1, patientName: '', sex: '', age: '', triage: '', transportLocation: '',
+        transportedBy: '', transportDateTime: ''
+    }]);
 
     const handleIncidentDetailChange = (e) => {
         const { name, value } = e.target;
@@ -100,72 +100,70 @@ const CommandPostView = ({ unitReportData }) => {
     };
 
     const handleUnitTrackChange = (unitId, field, value) => {
-        setTrackedUnits(prev =>
-            prev.map(unit =>
-                unit.id === unitId ? { ...unit, [field]: value } : unit
-            )
-        );
+        setTrackedUnits(prev => prev.map(u => u.id === unitId ? { ...u, [field]: value } : u));
     };
     
     const handlePersonnelTrackChange = (personnelId, field, value) => {
-        setTrackedPersonnel(prev =>
-            prev.map(person =>
-                person.id === personnelId ? { ...person, [field]: value } : person
-            )
-        );
+        setTrackedPersonnel(prev => prev.map(p => p.id === personnelId ? { ...p, [field]: value } : p));
     };
 
-    const handleReset = () => {
-        if (window.confirm("¿Está seguro de que desea limpiar todos los datos de la intervención? Esta acción no se puede deshacer.")) {
-            setIncidentDetails(initialIncidentDetails);
-            setSci201Data(initialSci201Data);
-            setSci211Resources([]);
-            setSci207Victims([]);
-            setResetKey(prev => prev + 1);
-        }
-    };
-
-    // --- Handlers for SCI 201 ---
     const handleSci201Change = (e) => {
-        setSci201Data(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setSci201Data(prev => ({...prev, [name]: value}));
     };
+
     const handleSci201ActionChange = (id, field, value) => {
         setSci201Data(prev => ({
             ...prev,
-            actions: prev.actions.map(action => action.id === id ? { ...action, [field]: value } : action)
+            actions: prev.actions.map(a => a.id === id ? {...a, [field]: value} : a)
         }));
     };
+
     const addSci201Action = () => {
-        setSci201Data(prev => ({ ...prev, actions: [...prev.actions, { id: Date.now(), time: '', summary: '' }] }));
+        setSci201Data(prev => ({
+            ...prev,
+            actions: [...prev.actions, {id: Date.now(), time: '', summary: ''}]
+        }));
     };
+
     const removeSci201Action = (id) => {
-        setSci201Data(prev => ({ ...prev, actions: prev.actions.filter(action => action.id !== id) }));
+        setSci201Data(prev => ({
+            ...prev,
+            actions: prev.actions.filter(a => a.id !== id)
+        }));
     };
-
-    // --- Handlers for SCI 211 ---
+    
     const handleSci211Change = (id, field, value) => {
-        setSci211Resources(prev => prev.map(res => res.id === id ? { ...res, [field]: value } : res));
+        setSci211Resources(prev => prev.map(r => r.id === id ? {...r, [field]: value} : r));
     };
+
     const addSci211Resource = () => {
-        const newResource = { id: Date.now(), requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '', institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '', demobilizedBy: '', demobilizedDateTime: '', observations: '' };
-        setSci211Resources(prev => [...prev, newResource]);
+        setSci211Resources(prev => [...prev, {
+            id: Date.now(), requestedBy: '', requestDateTime: '', classType: '', resourceType: '', arrivalDateTime: '',
+            institution: '', matricula: '', personnelCount: '', status: 'Disponible', assignedTo: '',
+            demobilizedBy: '', demobilizedDateTime: '', observations: ''
+        }]);
     };
+
     const removeSci211Resource = (id) => {
-        setSci211Resources(prev => prev.filter(res => res.id !== id));
+        setSci211Resources(prev => prev.filter(r => r.id !== id));
     };
-
-    // --- Handlers for SCI 207 ---
+    
     const handleSci207Change = (id, field, value) => {
-        setSci207Victims(prev => prev.map(vic => vic.id === id ? { ...vic, [field]: value } : vic));
-    };
-    const addSci207Victim = () => {
-        const newVictim = { id: Date.now(), patientName: '', sex: '', age: '', triage: '', transportLocation: '', transportedBy: '', transportDateTime: '' };
-        setSci207Victims(prev => [...prev, newVictim]);
-    };
-    const removeSci207Victim = (id) => {
-        setSci207Victims(prev => prev.filter(vic => vic.id !== id));
+        setSci207Victims(prev => prev.map(v => v.id === id ? {...v, [field]: value} : v));
     };
 
+    const addSci207Victim = () => {
+        setSci207Victims(prev => [...prev, {
+            id: Date.now(), patientName: '', sex: '', age: '', triage: '', transportLocation: '',
+            transportedBy: '', transportDateTime: ''
+        }]);
+    };
+
+    const removeSci207Victim = (id) => {
+        setSci207Victims(prev => prev.filter(v => v.id !== id));
+    };
+    
     const triageColors = {
         'Rojo': 'bg-red-600 text-white',
         'Amarillo': 'bg-yellow-500 text-black',
@@ -174,38 +172,38 @@ const CommandPostView = ({ unitReportData }) => {
         '': 'bg-zinc-600 text-white'
     };
 
-    return (
-        React.createElement("div", { className: "animate-fade-in space-y-6" },
-            React.createElement("div", { className: "flex flex-col sm:flex-row justify-between items-center bg-zinc-800/60 p-4 rounded-xl gap-4" },
-                React.createElement("div", { className: "flex items-center gap-4" },
-                    React.createElement(AnnotationIcon, { className: "w-8 h-8 text-yellow-300" }),
-                    React.createElement("h2", { className: "text-2xl lg:text-3xl font-bold text-white" }, "Puesto de Comando - Control de Intervención")
-                ),
-                React.createElement("div", { className: "flex-shrink-0 flex items-center gap-2" },
-                    React.createElement("button", { onClick: () => exportCommandPostToPdf(incidentDetails, trackedUnits, trackedPersonnel), className: "flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-md transition-colors" },
-                        React.createElement(DownloadIcon, { className: "w-5 h-5" }),
-                        "Generar Reporte"
-                    ),
-                    React.createElement("button", { onClick: handleReset, className: "flex items-center gap-2 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-medium rounded-md transition-colors" },
-                        React.createElement(RefreshIcon, { className: "w-5 h-5" }),
-                        "Limpiar Hoja"
-                    )
-                )
-            ),
+    const handleExport = () => {
+        exportCommandPostToPdf(
+            incidentDetails,
+            trackedUnits,
+            trackedPersonnel,
+            sci201Data,
+            sci211Resources,
+            sci207Victims,
+            croquisSketch
+        );
+    };
 
-            React.createElement("div", { className: "bg-zinc-800/60 p-2 rounded-xl" },
+    return (
+        React.createElement("div", { className: "space-y-6" },
+            React.createElement("div", { className: "bg-zinc-800/60 p-2 rounded-xl flex items-center justify-between" },
                 React.createElement("div", { className: "flex flex-wrap gap-2" },
                     React.createElement(TabButton, { activeTab: activeTab, tabName: "control", label: "Control General", onClick: setActiveTab }),
+                    React.createElement(TabButton, { activeTab: activeTab, tabName: "croquis", label: "Croquis Táctico", onClick: setActiveTab }),
                     React.createElement(TabButton, { activeTab: activeTab, tabName: "sci201", label: "Formulario SCI-201 (Resumen)", onClick: setActiveTab }),
                     React.createElement(TabButton, { activeTab: activeTab, tabName: "sci211", label: "Formulario SCI-211 (Recursos)", onClick: setActiveTab }),
                     React.createElement(TabButton, { activeTab: activeTab, tabName: "sci207", label: "Formulario SCI-207 (Víctimas)", onClick: setActiveTab })
+                ),
+                 React.createElement("button", { onClick: handleExport, className: "flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-md text-white font-semibold" },
+                    React.createElement(DownloadIcon, { className: "w-5 h-5" }),
+                    "Exportar Reporte PDF"
                 )
             ),
 
             activeTab === 'control' && (
-                React.createElement("div", { className: "space-y-6" },
+                React.createElement("div", { className: "space-y-6 animate-fade-in" },
                     React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4" },
-                        React.createElement("h3", { className: "text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2" }, "Datos Generales del Siniestro"),
+                        React.createElement("h3", { className: "text-xl font-semibold text-yellow-300" }, "Datos Generales del Siniestro"),
                         React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" },
                             React.createElement(FormInput, { label: "Tipo de Siniestro", name: "type", value: incidentDetails.type, onChange: handleIncidentDetailChange }),
                             React.createElement(FormInput, { label: "Dirección", name: "address", value: incidentDetails.address, onChange: handleIncidentDetailChange }),
@@ -282,9 +280,15 @@ const CommandPostView = ({ unitReportData }) => {
                     )
                 )
             ),
+
+            activeTab === 'croquis' && (
+                React.createElement("div", { className: "animate-fade-in" },
+                    React.createElement(Croquis, { onSketchChange: setCroquisSketch })
+                )
+            ),
             
             activeTab === 'sci201' && (
-                React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4" },
+                React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in" },
                     React.createElement("h3", { className: "text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2" }, "Formulario SCI-201: Resumen del Incidente"),
                      React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" },
                         React.createElement(FormInput, { label: "1. Nombre del Incidente", name: "incidentName", value: sci201Data.incidentName, onChange: handleSci201Change }),
@@ -332,7 +336,7 @@ const CommandPostView = ({ unitReportData }) => {
             ),
             
             activeTab === 'sci211' && (
-                 React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4" },
+                 React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in" },
                     React.createElement("h3", { className: "text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2 mb-4" }, "Formulario SCI-211: Registro y Control de Recursos"),
                     React.createElement("div", { className: "overflow-x-auto" },
                         React.createElement("table", { className: "w-full text-left min-w-[1200px] text-sm" },
@@ -379,7 +383,7 @@ const CommandPostView = ({ unitReportData }) => {
             ),
             
             activeTab === 'sci207' && (
-                React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4" },
+                React.createElement("div", { className: "bg-zinc-800/60 p-6 rounded-xl space-y-4 animate-fade-in" },
                     React.createElement("h3", { className: "text-xl font-semibold text-yellow-300 border-b border-zinc-700 pb-2 mb-4" }, "Formulario SCI-207: Registro de Víctimas"),
                      React.createElement("div", { className: "overflow-x-auto" },
                         React.createElement("table", { className: "w-full text-left min-w-[1000px] text-sm" },
