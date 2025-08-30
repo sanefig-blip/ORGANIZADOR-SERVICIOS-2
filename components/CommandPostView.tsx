@@ -310,7 +310,7 @@ const CommandPostView: React.FC<CommandPostViewProps> = ({ unitReportData }) => 
 
             {activeTab === 'croquis' && (
                 <div className="animate-fade-in">
-                    <Croquis onSketchChange={setCroquisSketch} />
+                    <Croquis onSketchChange={setCroquisSketch} isActive={activeTab === 'croquis'} />
                 </div>
             )}
             

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fire-dept-organizer-cache-v16';
+const CACHE_NAME = 'fire-dept-organizer-cache-v19';
 const urlsToCache = [
   './',
   './index.html',
@@ -45,7 +45,9 @@ const urlsToCache = [
   'https://esm.sh/jspdf-autotable@3.8.2',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 ];
 
 self.addEventListener('install', (event) => {

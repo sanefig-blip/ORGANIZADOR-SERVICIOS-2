@@ -283,7 +283,7 @@ const CommandPostView = ({ unitReportData }) => {
 
             activeTab === 'croquis' && (
                 React.createElement("div", { className: "animate-fade-in" },
-                    React.createElement(Croquis, { onSketchChange: setCroquisSketch })
+                    React.createElement(Croquis, { onSketchChange: setCroquisSketch, isActive: activeTab === 'croquis' })
                 )
             ),
             

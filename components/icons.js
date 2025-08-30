@@ -228,3 +228,21 @@ export const PersonIcon = ({ className }) => (
         React.createElement("path", { d: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" })
     )
 );
+
+export const CrosshairsIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 8v8m-4-4h8m-8-4a8 8 0 100 16 8 8 0 000-16z" })
+    )
+);
+
+export const MaximizeIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5 5" })
+    )
+);
+
+export const MinimizeIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M15 4h4v4m0-4l-5 5M4 15v4h4m-4 0l5-5m11-5h-4V4m4 4l-5-5M9 20h-4v-4m4 4l-5-5" })
+    )
+);
