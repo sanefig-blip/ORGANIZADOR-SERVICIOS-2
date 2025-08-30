@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fire-dept-organizer-cache-v19';
+const CACHE_NAME = 'fire-dept-organizer-cache-v22';
 const urlsToCache = [
   './',
   './index.html',
@@ -22,6 +22,7 @@ const urlsToCache = [
   './components/EraReportDisplay.js',
   './components/GeneratorReportDisplay.js',
   './components/Croquis.js',
+  './components/MaterialsDisplay.js',
   './services/geminiService.js',
   './services/exportService.js',
   './services/wordImportService.js',
@@ -34,6 +35,7 @@ const urlsToCache = [
   './data/unitReportData.js',
   './data/eraData.js',
   './data/generatorData.js',
+  './data/materialsData.js',
   './data/streets.js',
   'https://cdn.tailwindcss.com',
   'https://esm.sh/docx@8.5.0',

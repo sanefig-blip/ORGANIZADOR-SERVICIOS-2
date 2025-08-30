@@ -2,7 +2,8 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Headi
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit, SCI201Data, SCI211Resource, SCI207Victim } from '../types';
+// FIX: Add MaterialsData type import
+import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit, SCI201Data, SCI211Resource, SCI207Victim, MaterialsData } from '../types';
 
 // Helper to save files
 const saveFile = (data: BlobPart, fileName: string, fileType: string) => {
@@ -651,6 +652,51 @@ export const exportUnitStatusToPdf = (filteredUnits: (FireUnit & { groupName: st
     doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
 };
 
+// FIX: Add exportMaterialsReportToPdf function
+export const exportMaterialsReportToPdf = (reportData: MaterialsData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Materiales", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    const body = reportData.locations.reduce((acc: any[][], location) => {
+        if (location.materials.length === 0) {
+            acc.push([{ content: location.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            location.materials.forEach((material, index) => {
+                acc.push([
+                    index === 0 ? { content: location.name, rowSpan: location.materials.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    material.name,
+                    material.quantity,
+                    material.condition,
+                    material.location || '-'
+                ]);
+            });
+        }
+        return acc;
+    }, []);
+
+    autoTable(doc, {
+        head: [['ESTACIÓN / DEST.', 'MATERIAL', 'CANT.', 'CONDICIÓN', 'UBICACIÓN']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_Materiales_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
 export const exportCommandPostToPdf = (
     incidentDetails: any, 
     trackedUnits: any[], 
@@ -821,5 +867,5 @@ export const exportUnitsToExcel = (units: string[]) => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Unidades');
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };

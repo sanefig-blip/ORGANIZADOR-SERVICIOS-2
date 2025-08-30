@@ -55,3 +55,8 @@ export const EraData = {};
 export const GeneratorEquipment = {};
 export const GeneratorReportStation = {};
 export const GeneratorData = {};
+
+// Materials Report Types
+export const Material = {};
+export const MaterialLocation = {};
+export const MaterialsData = {};

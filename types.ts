@@ -229,3 +229,22 @@ export interface SCI207Victim {
     transportedBy: string;
     transportDateTime: string;
 }
+
+// New types for Materials Report
+export interface Material {
+  id: string;
+  name: string;
+  quantity: number;
+  condition: 'Para Servicio' | 'Fuera de Servicio';
+  location?: string;
+}
+
+export interface MaterialLocation {
+  name: string;
+  materials: Material[];
+}
+
+export interface MaterialsData {
+  reportDate: string;
+  locations: MaterialLocation[];
+}

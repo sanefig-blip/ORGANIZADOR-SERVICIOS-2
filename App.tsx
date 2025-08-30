@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData } from './types.ts';
+import { rankOrder, Schedule, Personnel, Rank, Roster, Service, Officer, ServiceTemplate, Assignment, UnitReportData, EraData, GeneratorData, MaterialsData } from './types.ts';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.ts';
 import { unitReportData as preloadedUnitReportData } from './data/unitReportData.ts';
 import { eraData as preloadedEraData } from './data/eraData.ts';
 import { generatorData as preloadedGeneratorData } from './data/generatorData.ts';
+import { materialsData as preloadedMaterialsData } from './data/materialsData.ts';
 import { rosterData as preloadedRosterData } from './data/rosterData.ts';
 import { commandPersonnelData as defaultCommandPersonnel } from './data/commandPersonnelData.ts';
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.ts';
@@ -19,7 +20,8 @@ import UnitStatusView from './components/UnitStatusView.tsx';
 import CommandPostView from './components/CommandPostView.tsx';
 import EraReportDisplay from './components/EraReportDisplay.tsx';
 import GeneratorReportDisplay from './components/GeneratorReportDisplay.tsx';
-import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon } from './components/icons.tsx';
+import MaterialsDisplay from './components/MaterialsDisplay.tsx';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
 import RosterImportModal from './components/RosterImportModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';
@@ -45,6 +47,7 @@ const App: React.FC = () => {
     const [unitReport, setUnitReport] = useState<UnitReportData | null>(null);
     const [eraReport, setEraReport] = useState<EraData | null>(null);
     const [generatorReport, setGeneratorReport] = useState<GeneratorData | null>(null);
+    const [materialsReport, setMaterialsReport] = useState<MaterialsData | null>(null);
     const [view, setView] = useState('unit-report'); // Default to new view
     const [displayDate, setDisplayDate] = useState<Date | null>(null);
     const [commandPersonnel, setCommandPersonnel] = useState<Personnel[]>([]);
@@ -186,11 +189,21 @@ const App: React.FC = () => {
             console.error("Failed to load or parse Generator report data, falling back to default.", e);
             generatorReportToLoad = preloadedGeneratorData;
         }
+
+        let materialsReportToLoad;
+        try {
+            const savedMaterialsReportJSON = localStorage.getItem('materialsData');
+            materialsReportToLoad = savedMaterialsReportJSON ? JSON.parse(savedMaterialsReportJSON) : preloadedMaterialsData;
+        } catch (e) {
+            console.error("Failed to load or parse Materials report data, falling back to default.", e);
+            materialsReportToLoad = preloadedMaterialsData;
+        }
           
         setSchedule(dataCopy);
         setUnitReport(unitReportToLoad);
         setEraReport(eraReportToLoad);
         setGeneratorReport(generatorReportToLoad);
+        setMaterialsReport(materialsReportToLoad);
         setCommandPersonnel(loadedCommandPersonnel);
         setServicePersonnel(JSON.parse(localStorage.getItem('servicePersonnel') || JSON.stringify(defaultServicePersonnel)));
 
@@ -251,6 +264,11 @@ const App: React.FC = () => {
     const handleUpdateGeneratorReport = (updatedData: GeneratorData) => {
         localStorage.setItem('generatorReportData', JSON.stringify(updatedData));
         setGeneratorReport(updatedData);
+    };
+    
+    const handleUpdateMaterialsReport = (updatedData: MaterialsData) => {
+        localStorage.setItem('materialsData', JSON.stringify(updatedData));
+        setMaterialsReport(updatedData);
     };
 
     const handleUpdateService = (updatedService: Service, type: 'common' | 'sports') => {
@@ -728,6 +746,14 @@ const App: React.FC = () => {
                         onUpdateReport={handleUpdateGeneratorReport}
                     />
                 );
+            case 'materials':
+                if (!materialsReport) return null;
+                return (
+                    <MaterialsDisplay
+                        reportData={materialsReport}
+                        onUpdateReport={handleUpdateMaterialsReport}
+                    />
+                );
             case 'schedule':
                 if (!filteredSchedule) return null;
                 return (
@@ -762,7 +788,7 @@ const App: React.FC = () => {
     
     const getButtonClass = (buttonView: string) => `flex items-center gap-2 px-4 py-2 rounded-md transition-colors font-medium ${view === buttonView ? 'bg-blue-600 text-white shadow-lg' : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-300'}`;
     
-    if (!schedule || !displayDate || !unitReport || !eraReport || !generatorReport) {
+    if (!schedule || !displayDate || !unitReport || !eraReport || !generatorReport || !materialsReport) {
         return (
             <div className="bg-zinc-900 text-white min-h-screen flex justify-center items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500" />
@@ -793,6 +819,7 @@ const App: React.FC = () => {
                             <button className={getButtonClass('command-post')} onClick={() => setView('command-post')}><AnnotationIcon className="w-5 h-5" /> Puesto Comando</button>
                             <button className={getButtonClass('era-report')} onClick={() => setView('era-report')}><LightningBoltIcon className="w-5 h-5" /> Trasvazadores E.R.A.</button>
                             <button className={getButtonClass('generator-report')} onClick={() => setView('generator-report')}><LightningBoltIcon className="w-5 h-5" /> Grupos Electrógenos</button>
+                            <button className={getButtonClass('materials')} onClick={() => setView('materials')}><CubeIcon className="w-5 h-5" /> Materiales</button>
                             <button className={getButtonClass('schedule')} onClick={() => setView('schedule')}><ClipboardListIcon className="w-5 h-5" /> Planificador</button>
                             <button className={getButtonClass('time-grouped')} onClick={() => setView('time-grouped')}><ClockIcon className="w-5 h-5" /> Vista por Hora</button>
                             <button className={getButtonClass('nomenclador')} onClick={() => setView('nomenclador')}><BookOpenIcon className="w-5 h-5" /> Nomencladores</button>
