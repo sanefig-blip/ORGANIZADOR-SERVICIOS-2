@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Schedule, Officer, Service, Assignment, Personnel, RANKS, Rank } from '../types';
 import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon, SearchIcon } from './icons';
@@ -910,5 +911,4 @@ const ScheduleDisplay: React.FC<ScheduleDisplayProps> = (props) => {
   );
 };
 
-// FIX: Add default export for the component
 export default ScheduleDisplay;

@@ -650,6 +650,50 @@ export const exportUnitStatusToPdf = (filteredUnits) => {
     doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
 };
 
+export const exportMaterialsReportToPdf = (reportData) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    let y = 15;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Reporte de Materiales", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150);
+    doc.text(reportData.reportDate, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    const body = reportData.locations.reduce((acc, location) => {
+        if (location.materials.length === 0) {
+            acc.push([{ content: location.name, styles: { fontStyle: 'bold' } }, { content: 'NO POSEE', colSpan: 4, styles: { halign: 'center' } }]);
+        } else {
+            location.materials.forEach((material, index) => {
+                acc.push([
+                    index === 0 ? { content: location.name, rowSpan: location.materials.length, styles: { fontStyle: 'bold', valign: 'middle' } } : '',
+                    material.name,
+                    material.quantity,
+                    material.condition,
+                    material.location || '-'
+                ]);
+            });
+        }
+        return acc;
+    }, []);
+
+    autoTable(doc, {
+        head: [['ESTACIÓN / DEST.', 'MATERIAL', 'CANT.', 'CONDICIÓN', 'UBICACIÓN']],
+        body: body,
+        startY: y,
+        theme: 'grid',
+        headStyles: { fillColor: '#3f3f46' },
+        styles: { fontSize: 9 }
+    });
+
+    doc.save(`Reporte_Materiales_${reportData.reportDate.split(',')[0].replace(/\//g, '-')}.pdf`);
+};
+
 export const exportCommandPostToPdf = (
     incidentDetails, 
     trackedUnits, 

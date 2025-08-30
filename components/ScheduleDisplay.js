@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RANKS } from '../types.js';
 import { CalendarIcon, UserGroupIcon, ClipboardListIcon, ChevronDownIcon, PencilIcon, XCircleIcon, AnnotationIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, BookmarkIcon, RefreshIcon, SearchIcon } from './icons.js';
@@ -863,5 +864,4 @@ const ScheduleDisplay = (props) => {
     )
   );
 };
-// FIX: Add default export for the component
 export default ScheduleDisplay;

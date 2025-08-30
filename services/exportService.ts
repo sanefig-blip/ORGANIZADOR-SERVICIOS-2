@@ -2,7 +2,6 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Headi
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-// FIX: Add MaterialsData type import
 import { Schedule, Assignment, Service, Personnel, UnitReportData, RANKS, EraData, GeneratorData, UnitGroup, FireUnit, SCI201Data, SCI211Resource, SCI207Victim, MaterialsData } from '../types';
 
 // Helper to save files
@@ -652,7 +651,6 @@ export const exportUnitStatusToPdf = (filteredUnits: (FireUnit & { groupName: st
     doc.save(`Estado_Unidades_${new Date().toLocaleDateString('es-AR').replace(/\//g, '-')}.pdf`);
 };
 
-// FIX: Add exportMaterialsReportToPdf function
 export const exportMaterialsReportToPdf = (reportData: MaterialsData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -843,7 +841,7 @@ export const exportCommandPostToPdf = (
 };
 
 
-export const exportPersonnelToExcel = (personnel: Personnel[], title: string) => {
+export const exportPersonnelToExcel = (personnel, title) => {
     const data = personnel.map(p => ({
         'L.P.': p.id,
         'Jerarquía': p.rank,
@@ -861,11 +859,11 @@ export const exportPersonnelToExcel = (personnel: Personnel[], title: string) =>
     saveFile(excelBuffer, `${title.replace(/\s/g, '_')}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };
 
-export const exportUnitsToExcel = (units: string[]) => {
+export const exportUnitsToExcel = (units) => {
     const data = units.map(u => ({ 'ID de Unidad': u }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Unidades');
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    saveFile(excelBuffer, 'Nomenclador_Unidades.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 };

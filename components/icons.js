@@ -246,3 +246,9 @@ export const MinimizeIcon = ({ className }) => (
         React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M15 4h4v4m0-4l-5 5M4 15v4h4m-4 0l5-5m11-5h-4V4m4 4l-5-5M9 20h-4v-4m4 4l-5-5" })
     )
 );
+
+export const CubeIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m0 0v10l8 4m0-14L4 7" })
+    )
+);
