@@ -155,32 +155,27 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
             
             if (type && id && id.length > 2 && !blockStartKeywords.some(k => type.toUpperCase().startsWith(k)) && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
                 const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim().toUpperCase();
-                const officerNameOrReason = String(row[colOffset + 3] || '').trim();
+                const officerName = String(row[colOffset + 3] || '').trim();
                 const personnelCountRaw = row[colOffset + 4];
-                const poc = String(row[colOffset + 5] || '').trim();
+                const pocRaw = String(row[colOffset + 5] || '').trim();
 
                 let status = 'Para Servicio';
                 let outOfServiceReason: string | undefined = undefined;
-                let officerInCharge: string | undefined = undefined;
+                let officerInCharge: string | undefined = officerName || undefined;
+                let poc: string | undefined = pocRaw || undefined;
                 let personnelCount: number | null = null;
                 
                 if (statusRaw.includes('F/S')) {
                     status = 'Fuera de Servicio';
-                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/F\/S/i, '').trim() || undefined;
+                    outOfServiceReason = officerName || statusRaw.replace(/F\/S/i, '').trim() || undefined;
+                    officerInCharge = undefined; // Clear officer if out of service
                 } else {
                     if (statusRaw.includes('RESERVA')) {
                         status = 'Reserva';
                     } else if (statusRaw.includes('A/P') || statusRaw.includes('A PRÉSTAMO')) {
                         status = 'A Préstamo';
                     }
-                    
-                    if (officerNameOrReason) {
-                        officerInCharge = officerNameOrReason;
-                    } else if (poc) {
-                        officerInCharge = poc;
-                    }
                 }
-
 
                 if (personnelCountRaw !== null && personnelCountRaw !== undefined && String(personnelCountRaw).trim() !== '') {
                     const count = parseInt(String(personnelCountRaw), 10);
@@ -193,7 +188,8 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
                     id,
                     type,
                     status,
-                    officerInCharge: officerInCharge || undefined,
+                    officerInCharge,
+                    poc,
                     outOfServiceReason,
                     personnelCount,
                 });
@@ -209,7 +205,7 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
         'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
         'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
     ];
-    const columnsToScan = [0, 4, 9];
+    const columnsToScan = [0, 6, 12]; // Adjusted column scan indices
 
     rows.forEach((row, r) => {
         if (row) {

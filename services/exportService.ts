@@ -490,7 +490,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
     reportData.zones.forEach(zone => {
         allRows.push([{
             content: zone.name,
-            colSpan: 5,
+            colSpan: 6,
             styles: {
                 halign: 'center',
                 fontStyle: 'bold',
@@ -503,7 +503,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
         zone.groups.forEach((group: UnitGroup) => {
             allRows.push([{
                 content: group.name,
-                colSpan: 5,
+                colSpan: 6,
                 styles: {
                     fontStyle: 'bold',
                     fillColor: '#3f3f46', // zinc-700
@@ -518,6 +518,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
                     unit.type,
                     `${unit.status}${unit.outOfServiceReason ? ` (${unit.outOfServiceReason})` : ''}`,
                     unit.officerInCharge || '-',
+                    unit.poc || '-',
                     unit.personnelCount ?? '-'
                 ]);
             });
@@ -525,7 +526,7 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
     });
 
     autoTable(doc, {
-        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'Personal']],
+        head: [['Unidad', 'Tipo', 'Estado', 'Oficial a Cargo', 'POC', 'Personal']],
         body: allRows,
         startY: 25,
         theme: 'grid',
@@ -540,11 +541,12 @@ export const exportUnitReportToPdf = (reportData: UnitReportData) => {
             font: 'helvetica'
         },
         columnStyles: {
-            0: { cellWidth: 40 },
-            1: { cellWidth: 35 },
+            0: { cellWidth: 35 },
+            1: { cellWidth: 30 },
             2: { cellWidth: 35 },
             3: { cellWidth: 'auto' },
-            4: { cellWidth: 15, halign: 'center' },
+            4: { cellWidth: 30 },
+            5: { cellWidth: 15, halign: 'center' },
         },
         didDrawPage: (data) => {
             drawPageHeader();

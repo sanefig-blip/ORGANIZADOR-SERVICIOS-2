@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import { UnitReportData, Zone, UnitGroup, FireUnit, Personnel, RANKS } from '../types';
 import { ChevronDownIcon, SearchIcon, PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons';
@@ -88,6 +87,7 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
          type: 'Tipo',
          status: 'Para Servicio',
          officerInCharge: '',
+         poc: '',
          personnelCount: null,
          internalId: ''
        };
@@ -174,7 +174,8 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
             unit.type.toLowerCase().includes(lowercasedFilter) ||
             unit.status.toLowerCase().includes(lowercasedFilter) ||
             (unit.internalId || '').toLowerCase().includes(lowercasedFilter) ||
-            (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter)
+            (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter) ||
+            (unit.poc || '').toLowerCase().includes(lowercasedFilter)
           );
         }).map(group => ({
             ...group,
@@ -187,7 +188,8 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
                 unit.type.toLowerCase().includes(lowercasedFilter) ||
                 unit.status.toLowerCase().includes(lowercasedFilter) ||
                 (unit.internalId || '').toLowerCase().includes(lowercasedFilter) ||
-                (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter)
+                (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter) ||
+                (unit.poc || '').toLowerCase().includes(lowercasedFilter)
             )
         }));
         return { ...zone, groups: filteredGroups };
@@ -394,6 +396,7 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
                                 <th className="p-2">Tipo</th>
                                 <th className="p-2">Estado</th>
                                 <th className="p-2">Oficial a Cargo</th>
+                                <th className="p-2">POC</th>
                                 <th className="p-2 text-right w-24">Personal</th>
                                 {isEditing && <th className="p-2 w-12" aria-label="Acciones"></th>}
                               </tr>
@@ -503,6 +506,14 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
                                         );
                                     })()}
                                   </td>
+                                  <td className="p-2 text-zinc-300">
+                                     {isEditing ? (
+                                      <input
+                                        type="text" value={unit.poc || ''}
+                                        onChange={(e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'poc', e.target.value)}
+                                        className="w-full bg-zinc-700 border-zinc-600 rounded-md px-2 py-1 text-white"/>
+                                    ) : (unit.poc || '-')}
+                                  </td>
                                   <td className="p-2 text-right text-zinc-200 font-semibold">
                                     {isEditing ? (
                                         <input
@@ -531,7 +542,7 @@ const UnitReportDisplay: React.FC<UnitReportDisplayProps> = ({ reportData, searc
                              {isEditing && (
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={7} className="pt-2">
+                                        <td colSpan={8} className="pt-2">
                                             <button
                                                 type="button"
                                                 onClick={() => handleAddUnit(zoneIdx, groupIdx)}

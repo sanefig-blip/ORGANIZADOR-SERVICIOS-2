@@ -108,6 +108,7 @@ export interface FireUnit {
   status: string;
   outOfServiceReason?: string;
   officerInCharge?: string;
+  poc?: string;
   personnelCount?: number | null;
   internalId?: string;
 }
