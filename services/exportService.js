@@ -16,6 +16,17 @@ const saveFile = (data, fileName, fileType) => {
     URL.revokeObjectURL(url);
 };
 
+// Helper to sanitize strings for XML
+const sanitizeXmlString = (str) => {
+    if (!str) return '';
+    // This regex removes most characters that are illegal in XML 1.0 documents.
+    // It keeps tab, newline, and carriage return.
+    // The range is U+0000 to U+001F, excluding U+0009, U+000A, U+000D.
+    // It also removes surrogate pairs which can be problematic.
+    return str.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/g, '');
+};
+
+
 // --- STYLES ---
 const LABEL_STYLE = { bold: true, font: "Arial", size: 22 }; // 11pt
 const CONTENT_STYLE = { font: "Arial", size: 22 }; // 11pt
@@ -33,7 +44,7 @@ const createAssignmentParagraphs = (assignment, includeServiceTitle) => {
 
     const detailParagraphs = otherDetails.map(detail =>
         new Paragraph({
-            children: [new TextRun({ text: detail.trim(), ...ITALIC_CONTENT_STYLE })],
+            children: [new TextRun({ text: sanitizeXmlString(detail.trim()), ...ITALIC_CONTENT_STYLE })],
             indent: { left: 400 },
             spacing: { after: 0 }
         })
@@ -45,7 +56,7 @@ const createAssignmentParagraphs = (assignment, includeServiceTitle) => {
         paragraphs.push(new Paragraph({
             children: [
                 new TextRun({ text: "Servicio: ", ...LABEL_STYLE }),
-                new TextRun({ text: assignment.serviceTitle, ...ITALIC_CONTENT_STYLE })
+                new TextRun({ text: sanitizeXmlString(assignment.serviceTitle), ...ITALIC_CONTENT_STYLE })
             ],
              spacing: { before: 200 }
         }));
@@ -56,7 +67,7 @@ const createAssignmentParagraphs = (assignment, includeServiceTitle) => {
             new Paragraph({
                 children: [
                     new TextRun({ text: "Novedad: ", ...LABEL_STYLE, color: "000000" }),
-                    new TextRun({ text: assignment.novelty, ...ITALIC_CONTENT_STYLE, color: "000000" })
+                    new TextRun({ text: sanitizeXmlString(assignment.novelty), ...ITALIC_CONTENT_STYLE, color: "000000" })
                 ],
                 shading: { type: ShadingType.CLEAR, fill: "FFFF00" },
                 spacing: { after: 100 }
@@ -67,27 +78,27 @@ const createAssignmentParagraphs = (assignment, includeServiceTitle) => {
     if (eventSubtitle) {
         const cleanSubtitle = eventSubtitle.replace(/^\d+-\s*O\.S\.\d+\s*/, '').trim();
         paragraphs.push(new Paragraph({
-            children: [new TextRun({ text: cleanSubtitle, bold: true, ...ITALIC_CONTENT_STYLE })],
+            children: [new TextRun({ text: sanitizeXmlString(cleanSubtitle), bold: true, ...ITALIC_CONTENT_STYLE })],
             spacing: { before: 100, after: 100 }
         }));
     }
 
     paragraphs.push(
         new Paragraph({
-            children: [new TextRun({ text: assignment.location, bold: true, size: 24, font: "Arial", underline: { type: UnderlineType.SINGLE, color: "000000"} })],
+            children: [new TextRun({ text: sanitizeXmlString(assignment.location), bold: true, size: 24, font: "Arial", underline: { type: UnderlineType.SINGLE, color: "000000"} })],
             spacing: { before: includeServiceTitle || eventSubtitle ? 100 : 200 }
         })
     );
 
     if (assignment.implementationTime) {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text: assignment.implementationTime, bold: true, ...CONTENT_STYLE })] }));
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text: sanitizeXmlString(assignment.implementationTime), bold: true, ...CONTENT_STYLE })] }));
     }
 
-    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario: ", ...LABEL_STYLE }), new TextRun({text: assignment.time, ...CONTENT_STYLE })] }));
-    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Personal: ", ...LABEL_STYLE }), new TextRun({text: assignment.personnel, ...CONTENT_STYLE })] }));
+    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario: ", ...LABEL_STYLE }), new TextRun({text: sanitizeXmlString(assignment.time), ...CONTENT_STYLE })] }));
+    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Personal: ", ...LABEL_STYLE }), new TextRun({text: sanitizeXmlString(assignment.personnel), ...CONTENT_STYLE })] }));
 
     if (assignment.unit) {
-        paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Unidad: ", ...LABEL_STYLE }), new TextRun({text: assignment.unit, ...CONTENT_STYLE })] }));
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Unidad: ", ...LABEL_STYLE }), new TextRun({text: sanitizeXmlString(assignment.unit), ...CONTENT_STYLE })] }));
     }
 
     paragraphs.push(...detailParagraphs);
@@ -107,11 +118,11 @@ export const exportScheduleToWord = (schedule) => {
                     style: "Heading2",
                     children: [
                         new TextRun({ text: "SERVICE_TITLE_MARKER::", size: 2, color: "FFFFFF" }),
-                        new TextRun(service.title)
+                        new TextRun(sanitizeXmlString(service.title))
                     ],
                 }),
                 ...(service.description ? [new Paragraph({
-                    children: [new TextRun({ text: service.description, ...ITALIC_CONTENT_STYLE })],
+                    children: [new TextRun({ text: sanitizeXmlString(service.description), ...ITALIC_CONTENT_STYLE })],
                     spacing: { after: 100 }
                 })] : []),
             ];
@@ -121,7 +132,7 @@ export const exportScheduleToWord = (schedule) => {
                      new Paragraph({
                         children: [
                             new TextRun({ text: "Novedad: ", ...LABEL_STYLE, color: "000000" }),
-                            new TextRun({ text: service.novelty, ...ITALIC_CONTENT_STYLE, color: "000000" })
+                            new TextRun({ text: sanitizeXmlString(service.novelty), ...ITALIC_CONTENT_STYLE, color: "000000" })
                         ],
                         shading: { type: ShadingType.CLEAR, fill: "FFFF00" },
                         spacing: { after: 100 }
@@ -133,7 +144,7 @@ export const exportScheduleToWord = (schedule) => {
         });
         
         if (title && serviceContent.length > 0) {
-            return [new Paragraph({ text: title, style: "Heading1", alignment: AlignmentType.LEFT }), ...serviceContent];
+            return [new Paragraph({ text: sanitizeXmlString(title), style: "Heading1", alignment: AlignmentType.LEFT }), ...serviceContent];
         }
         return serviceContent;
     };
@@ -141,9 +152,9 @@ export const exportScheduleToWord = (schedule) => {
     const commandStaffRows = schedule.commandStaff.map(officer => {
         return new TableRow({
             children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: officer.role, ...CONTENT_STYLE })]})], width: { size: 30, type: WidthType.PERCENTAGE } }),
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: officer.rank || 'OTRO', ...CONTENT_STYLE })]})], width: { size: 30, type: WidthType.PERCENTAGE } }),
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: officer.name, ...CONTENT_STYLE })]})], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: sanitizeXmlString(officer.role), ...CONTENT_STYLE })]})], width: { size: 30, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: sanitizeXmlString(officer.rank || 'OTRO'), ...CONTENT_STYLE })]})], width: { size: 30, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: sanitizeXmlString(officer.name), ...CONTENT_STYLE })]})], width: { size: 40, type: WidthType.PERCENTAGE } }),
             ],
         });
     });
@@ -177,7 +188,7 @@ export const exportScheduleToWord = (schedule) => {
         },
         sections: [{ children: [
             new Paragraph({ text: `ORDEN DE SERVICIO DIARIA`, style: "Heading1" }),
-            new Paragraph({ text: `GUARDIA DEL DIA ${schedule.date}`, alignment: AlignmentType.CENTER, spacing: { after: 400 }}),
+            new Paragraph({ text: `GUARDIA DEL DIA ${sanitizeXmlString(schedule.date)}`, alignment: AlignmentType.CENTER, spacing: { after: 400 }}),
             new Paragraph({ text: "LÍNEA DE GUARDIA", style: "Heading2" }),
             commandStaffTable,
             new Paragraph({ text: "", spacing: { after: 200 }}),
@@ -187,13 +198,13 @@ export const exportScheduleToWord = (schedule) => {
         ]}]
     });
 
-    Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_${sanitizeXmlString(schedule.date).replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
 export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }) => {
     const sortedTimeKeys = Object.keys(assignmentsByTime).sort((a, b) => parseInt(a.split(':')[0], 10) - parseInt(b.split(':')[0], 10));
     const content = sortedTimeKeys.flatMap(time => [
-        new Paragraph({ text: `Horario: ${time}`, style: "Heading2" }),
+        new Paragraph({ text: `Horario: ${sanitizeXmlString(time)}`, style: "Heading2" }),
         ...assignmentsByTime[time].flatMap(assignment => createAssignmentParagraphs(assignment, true))
     ]);
 
@@ -208,11 +219,11 @@ export const exportScheduleByTimeToWord = ({ date, assignmentsByTime }) => {
         },
         sections: [{ children: [
             new Paragraph({ text: `ORDEN DE SERVICIO DIARIA POR HORA`, style: "Heading1" }),
-            new Paragraph({ text: `GUARDIA DEL DIA ${date}`, alignment: AlignmentType.CENTER, spacing: { after: 400 }}),
+            new Paragraph({ text: `GUARDIA DEL DIA ${sanitizeXmlString(date)}`, alignment: AlignmentType.CENTER, spacing: { after: 400 }}),
             ...content,
         ]}]
     });
-    Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_por_Hora_${date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    Packer.toBlob(doc).then(blob => saveFile(blob, `Orden_de_Servicio_por_Hora_${sanitizeXmlString(date).replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
 
@@ -280,20 +291,20 @@ export const exportScheduleAsWordTemplate = (schedule) => {
         const sectionContent = services.flatMap(service => {
             const processAssignment = (assignment) => {
                 const paragraphs = [
-                    new Paragraph({ children: [new TextRun({ text: "Título del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.title, ...CONTENT_STYLE })] }),
-                    new Paragraph({ children: [new TextRun({ text: "Descripción del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.description || '', ...CONTENT_STYLE })] }),
-                    new Paragraph({ children: [new TextRun({ text: "Novedad del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: service.novelty || '', ...CONTENT_STYLE })] }),
+                    new Paragraph({ children: [new TextRun({ text: "Título del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(service.title), ...CONTENT_STYLE })] }),
+                    new Paragraph({ children: [new TextRun({ text: "Descripción del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(service.description), ...CONTENT_STYLE })] }),
+                    new Paragraph({ children: [new TextRun({ text: "Novedad del Servicio: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(service.novelty), ...CONTENT_STYLE })] }),
                 ];
 
                 if (assignment) {
-                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Ubicación de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.location, ...CONTENT_STYLE })] }));
-                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.time, ...CONTENT_STYLE })] }));
-                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Implantación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.implementationTime || '', ...CONTENT_STYLE })] }));
-                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Personal de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.personnel, ...CONTENT_STYLE })] }));
-                    if (assignment.unit) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Unidad de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: assignment.unit, ...CONTENT_STYLE })] }));
+                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Ubicación de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(assignment.location), ...CONTENT_STYLE })] }));
+                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(assignment.time), ...CONTENT_STYLE })] }));
+                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Horario de Implantación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(assignment.implementationTime), ...CONTENT_STYLE })] }));
+                    paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Personal de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(assignment.personnel), ...CONTENT_STYLE })] }));
+                    if (assignment.unit) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Unidad de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(assignment.unit), ...CONTENT_STYLE })] }));
                     
                     const allDetails = assignment.details || [];
-                    if (allDetails.length > 0) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Detalles de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: allDetails.join('; '), ...CONTENT_STYLE })] }));
+                    if (allDetails.length > 0) paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Detalles de Asignación: ", ...LABEL_STYLE }), new TextRun({ text: sanitizeXmlString(allDetails.join('; ')), ...CONTENT_STYLE })] }));
                 }
                 
                 paragraphs.push(new Paragraph({ text: "---", alignment: AlignmentType.CENTER, spacing: { before: 100, after: 100 } }));
@@ -307,7 +318,7 @@ export const exportScheduleAsWordTemplate = (schedule) => {
             sectionContent[sectionContent.length - 1] = new Paragraph({ text: "" }); // Remove last separator
         }
         
-        return [new Paragraph({ text: title, style: "Heading1" }), ...sectionContent];
+        return [new Paragraph({ text: sanitizeXmlString(title), style: "Heading1" }), ...sectionContent];
     };
 
     const commonServicesSection = createTemplateSection(schedule.services, "PLANTILLA DE SERVICIOS COMUNES");
@@ -328,7 +339,7 @@ export const exportScheduleAsWordTemplate = (schedule) => {
         ]}]
     });
 
-    Packer.toBlob(doc).then(blob => saveFile(blob, `plantilla_desde_horario_${schedule.date.replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    Packer.toBlob(doc).then(blob => saveFile(blob, `plantilla_desde_horario_${sanitizeXmlString(schedule.date).replace(/\s/g, '_')}.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
 };
 
 export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonnel }) => {
@@ -378,12 +389,12 @@ export const exportWordTemplate = ({ unitList, commandPersonnel, servicePersonne
 
     const unitParagraphs = [
         new Paragraph({ text: "Unidades Disponibles", style: "Heading2" }),
-        ...unitList.map(unit => new Paragraph({ text: unit, bullet: { level: 0 } }))
+        ...unitList.map(unit => new Paragraph({ text: sanitizeXmlString(unit), bullet: { level: 0 } }))
     ];
 
     const personnelParagraphs = [
         new Paragraph({ text: "Personal Disponible", style: "Heading2" }),
-        ...allPersonnel.map(p => new Paragraph({ text: `${p.rank} - ${p.name} (L.P. ${p.id})`, bullet: { level: 0 } }))
+        ...allPersonnel.map(p => new Paragraph({ text: sanitizeXmlString(`${p.rank} - ${p.name} (L.P. ${p.id})`), bullet: { level: 0 } }))
     ];
 
     const doc = new Document({
@@ -449,13 +460,13 @@ export const exportRosterWordTemplate = () => {
                 }),
                 new Paragraph({ text: "" }),
                 new Paragraph({ text: "01/08/2025" }),
-                new Paragraph({ text: "JEFE DE INSPECCIONES: APELLIDO, Nombre" }),
-                new Paragraph({ text: "JEFE DE SERVICIO: APELLIDO, Nombre" }),
-                new Paragraph({ text: "JEFE DE GUARDIA: APELLIDO, Nombre" }),
-                new Paragraph({ text: "JEFE DE RESERVA: APELLIDO, Nombre" }),
+                new Paragraph({ text: sanitizeXmlString("JEFE DE INSPECCIONES: APELLIDO, Nombre") }),
+                new Paragraph({ text: sanitizeXmlString("JEFE DE SERVICIO: APELLIDO, Nombre") }),
+                new Paragraph({ text: sanitizeXmlString("JEFE DE GUARDIA: APELLIDO, Nombre") }),
+                new Paragraph({ text: sanitizeXmlString("JEFE DE RESERVA: APELLIDO, Nombre") }),
                 new Paragraph({ text: "" }),
                 new Paragraph({ text: "02/08/2025" }),
-                new Paragraph({ text: "JEFE DE SERVICIO: OTRO APELLIDO, Nombre" }),
+                new Paragraph({ text: sanitizeXmlString("JEFE DE SERVICIO: OTRO APELLIDO, Nombre") }),
             ]
         }]
     });
