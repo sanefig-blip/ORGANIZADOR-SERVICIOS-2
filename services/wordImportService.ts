@@ -167,17 +167,18 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
                 if (statusRaw.includes('F/S')) {
                     status = 'Fuera de Servicio';
                     outOfServiceReason = officerNameOrReason || statusRaw.replace(/F\/S/i, '').trim() || undefined;
-                } else if (statusRaw.includes('RESERVA')) {
-                    status = 'Reserva';
-                    if (poc) officerInCharge = poc;
-                    else if (officerNameOrReason) officerInCharge = officerNameOrReason;
-                } else if (statusRaw.includes('A/P') || statusRaw.includes('A PRÉSTAMO')) {
-                    status = 'A Préstamo';
-                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/A\/P|A PRÉSTAMO/i, '').trim() || undefined;
-                } else { // Includes "PARA SERVICIO"
-                    status = 'Para Servicio';
-                    if (poc) officerInCharge = poc;
-                    else if (officerNameOrReason) officerInCharge = officerNameOrReason;
+                } else {
+                    if (statusRaw.includes('RESERVA')) {
+                        status = 'Reserva';
+                    } else if (statusRaw.includes('A/P') || statusRaw.includes('A PRÉSTAMO')) {
+                        status = 'A Préstamo';
+                    }
+                    
+                    if (officerNameOrReason) {
+                        officerInCharge = officerNameOrReason;
+                    } else if (poc) {
+                        officerInCharge = poc;
+                    }
                 }
 
 
@@ -203,44 +204,38 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
         }
     };
     
-    const blockStartsByRow = new Map<number, number[]>();
+    const blockStartsByCol = new Map<number, number[]>();
     const blockStartKeywords = [
         'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
         'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
     ];
+    const columnsToScan = [0, 4, 9];
 
     rows.forEach((row, r) => {
         if (row) {
-            [0, 4, 9].forEach(c => { // Check column A, E, J
+            columnsToScan.forEach(c => {
                 const cellValue = row[c];
                 if (cellValue) {
                     const upperCellValue = String(cellValue).toUpperCase().trim();
                     if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
-                       if (!blockStartsByRow.has(r)) {
-                           blockStartsByRow.set(r, []);
+                       if (!blockStartsByCol.has(c)) {
+                           blockStartsByCol.set(c, []);
                        }
-                       if (!blockStartsByRow.get(r)!.includes(c)) {
-                           blockStartsByRow.get(r)!.push(c);
-                       }
+                       blockStartsByCol.get(c)!.push(r);
                     }
                 }
             });
         }
     });
-    
-    const sortedRowKeys = Array.from(blockStartsByRow.keys()).sort((a, b) => a - b);
 
-    for (let i = 0; i < sortedRowKeys.length; i++) {
-        const currentRow = sortedRowKeys[i];
-        const nextRowKey = (i + 1 < sortedRowKeys.length) ? sortedRowKeys[i + 1] : rows.length;
-        const endRow = nextRowKey;
-
-        const colsOnThisRow = blockStartsByRow.get(currentRow)!.sort((a, b) => a - b);
-
-        for (const currentCol of colsOnThisRow) {
-            processBlock(currentRow, endRow, currentCol);
+    blockStartsByCol.forEach((startRows, col) => {
+        const sortedRows = startRows.sort((a, b) => a - b);
+        for (let i = 0; i < sortedRows.length; i++) {
+            const startRow = sortedRows[i];
+            const endRow = (i + 1 < sortedRows.length) ? sortedRows[i + 1] : rows.length;
+            processBlock(startRow, endRow, col);
         }
-    }
+    });
     
     const ZONES_LAYOUT: { [key: string]: string[] } = {
         "ZONA I": ["ESTACION I", "ESTACION II", "DTO. POMPEYA", "ESTACION III", "DTO. BOCA", "ESTACION X"],
