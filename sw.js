@@ -13,7 +13,6 @@ const urlsToCache = [
   './components/TimeGroupedScheduleDisplay.js',
   './components/Nomenclador.js',
   './components/HelpModal.js',
-  './components/RosterImportModal.js',
   './components/ServiceTemplateModal.js',
   './components/ExportTemplateModal.js',
   './components/UnitReportDisplay.js',

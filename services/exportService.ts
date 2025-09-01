@@ -438,6 +438,35 @@ export const exportRosterTemplate = () => {
     saveFile(JSON.stringify(template, null, 2), 'plantilla_rol_de_guardia.json', 'application/json');
 };
 
+export const exportRosterWordTemplate = () => {
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({
+                    children: [new TextRun({ text: "Plantilla para Rol de Guardia", bold: true, size: 28 })],
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: "Instrucciones: Mantenga el formato de fecha (DD/MM/AAAA) y de rol (ROL: Nombre).", italics: true, size: 22 })],
+                }),
+                new Paragraph({ text: "" }),
+                new Paragraph({ text: "01/08/2025" }),
+                new Paragraph({ text: "JEFE DE INSPECCIONES: APELLIDO, Nombre" }),
+                new Paragraph({ text: "JEFE DE SERVICIO: APELLIDO, Nombre" }),
+                new Paragraph({ text: "JEFE DE GUARDIA: APELLIDO, Nombre" }),
+                new Paragraph({ text: "JEFE DE RESERVA: APELLIDO, Nombre" }),
+                new Paragraph({ text: "" }),
+                new Paragraph({ text: "02/08/2025" }),
+                new Paragraph({ text: "JEFE DE SERVICIO: OTRO APELLIDO, Nombre" }),
+            ]
+        }]
+    });
+
+    Packer.toBlob(doc).then(blob => {
+        saveFile(blob, 'plantilla_rol_de_guardia.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    });
+};
+
+
 export const exportUnitReportToPdf = (reportData: UnitReportData) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;

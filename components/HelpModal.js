@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons.js';
-import { exportExcelTemplate, exportWordTemplate } from '../services/exportService.js';
+import { exportExcelTemplate, exportWordTemplate, exportRosterWordTemplate } from '../services/exportService.js';
 
 // FIX: Update component signature to accept personnel lists
 const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonnel }) => {
@@ -48,7 +49,7 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
             )
           ),
           React.createElement("section", null,
-            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Importar Archivo (Excel o Word)"),
+            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Importar Horario (Excel o Word)"),
             React.createElement("p", { className: "mb-4" },
               "Esta función permite añadir o reemplazar los servicios actuales cargando un archivo Excel (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".xlsx"), ") o Word (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), "). Al seleccionar el archivo, la aplicación te preguntará si deseas ", React.createElement("strong", { className: "text-white" }, "\"Añadir\""), " los nuevos servicios a los existentes o ", React.createElement("strong", { className: "text-white" }, "\"Reemplazar\""), " todo el horario."
             ),
@@ -85,6 +86,25 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
                 onClick: () => exportWordTemplate({ unitList, commandPersonnel, servicePersonnel }),
                 "aria-label": "Descargar plantilla de Word de ejemplo"
               }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), "Descargar Plantilla Word")
+            )
+          ),
+          React.createElement("section", null,
+            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Importar Rol de Guardia"),
+            React.createElement("p", { className: "mb-4" },
+              "Puedes importar el rol de guardia mensual desde un archivo ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".json"), " o un documento de Word (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), "). Si tienes el rol en un PDF, primero conviértelo a formato Word."
+            ),
+            React.createElement("h4", { className: "font-semibold text-white mb-2" }, "Formato del Archivo Word:"),
+            React.createElement("p", { className: "mb-3" }, "El documento debe tener fechas en formato ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, "DD/MM/AAAA"), " y debajo, las asignaciones con el formato ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, "ROL: Nombre Apellido"), "."),
+            React.createElement("div", { className: "bg-zinc-900/50 p-4 rounded-md border border-zinc-700 font-mono text-xs" },
+                React.createElement("p", null, "01/08/2025"),
+                React.createElement("p", null, React.createElement("span", { className: "text-yellow-300" }, "JEFE DE SERVICIO:"), " APELLIDO, Nombre"),
+                React.createElement("p", null, React.createElement("span", { className: "text-yellow-300" }, "JEFE DE GUARDIA:"), " OTRO APELLIDO, Nombre")
+            ),
+             React.createElement("div", { className: "mt-6 flex flex-wrap gap-4" },
+              React.createElement("button", {
+                className: "inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-md transition-colors",
+                onClick: () => exportRosterWordTemplate()
+              }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), "Descargar Plantilla Word para Rol")
             )
           ),
           React.createElement("section", null,

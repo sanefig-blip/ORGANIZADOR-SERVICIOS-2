@@ -10,8 +10,8 @@ import { commandPersonnelData as defaultCommandPersonnel } from './data/commandP
 import { servicePersonnelData as defaultServicePersonnel } from './data/servicePersonnelData.ts';
 import { defaultUnits } from './data/unitData.ts';
 import { defaultServiceTemplates } from './data/serviceTemplates.ts';
-import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate } from './services/exportService.ts';
-import { parseScheduleFromFile, parseFullUnitReportFromExcel } from './services/wordImportService.ts';
+import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate, exportRosterWordTemplate } from './services/exportService.ts';
+import { parseScheduleFromFile, parseFullUnitReportFromExcel, parseRosterFromWord } from './services/wordImportService.ts';
 import ScheduleDisplay from './components/ScheduleDisplay.tsx';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.tsx';
 import Nomenclador from './components/Nomenclador.tsx';
@@ -23,7 +23,6 @@ import GeneratorReportDisplay from './components/GeneratorReportDisplay.tsx';
 import MaterialsDisplay from './components/MaterialsDisplay.tsx';
 import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
-import RosterImportModal from './components/RosterImportModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';
 import ExportTemplateModal from './components/ExportTemplateModal.tsx';
 
@@ -59,7 +58,6 @@ const App: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-    const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [templateModalProps, setTemplateModalProps] = useState<any>({});
     const [isExportTemplateModalOpen, setIsExportTemplateModalOpen] = useState(false);
@@ -635,15 +633,35 @@ const App: React.FC = () => {
     const handleRosterImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+    
         if (window.confirm("¿Deseas fusionar los datos de este archivo con el rol de guardia actual?")) {
             try {
-                const newRosterData = JSON.parse(await file.text());
-                if (typeof newRosterData !== 'object' || newRosterData === null || Array.isArray(newRosterData)) throw new Error("Invalid JSON format.");
+                let newRosterData: Roster;
+                if (file.name.endsWith('.json')) {
+                    newRosterData = JSON.parse(await file.text());
+                    if (typeof newRosterData !== 'object' || newRosterData === null || Array.isArray(newRosterData)) {
+                        throw new Error("Invalid JSON format.");
+                    }
+                } else if (file.name.endsWith('.docx')) {
+                    const fileBuffer = await file.arrayBuffer();
+                    newRosterData = await parseRosterFromWord(fileBuffer);
+                } else {
+                    alert("Formato de archivo no soportado. Por favor, sube un archivo .json o .docx.");
+                    if(rosterInputRef.current) rosterInputRef.current.value = '';
+                    return;
+                }
+                
                 updateAndSaveRoster({ ...roster, ...newRosterData });
-                alert("Rol de guardia actualizado con éxito.");
-            } catch (error) { console.error("Error al importar el rol de guardia:", error); alert("Hubo un error al procesar el archivo."); }
+                showToast("Rol de guardia actualizado con éxito.");
+            } catch (error: any) { 
+                console.error("Error al importar el rol de guardia:", error); 
+                alert(`Hubo un error al procesar el archivo: ${error.message}`); 
+            } finally {
+                if(rosterInputRef.current) rosterInputRef.current.value = '';
+            }
+        } else {
+            if(rosterInputRef.current) rosterInputRef.current.value = '';
         }
-        if(rosterInputRef.current) rosterInputRef.current.value = '';
     };
     
     const handleSaveAsTemplate = (service: Service) => {
@@ -806,7 +824,7 @@ const App: React.FC = () => {
         React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen font-sans" },
             React.createElement("input", { type: "file", ref: fileInputRef, onChange: handleFileImport, style: { display: 'none' }, accept: ".xlsx,.xls,.docx,.ods" }),
             React.createElement("input", { type: "file", ref: unitReportFileInputRef, onChange: handleUnitReportImport, style: { display: 'none' }, accept: ".xlsx,.xls" }),
-            React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json" }),
+            React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json,.docx" }),
             React.createElement("header", { className: "bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
                 React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
                     React.createElement("div", { className: "flex flex-col sm:flex-row items-center justify-between h-auto sm:h-20 py-4 sm:py-0" },
@@ -845,8 +863,11 @@ const App: React.FC = () => {
                                             React.createElement("button", { type: "button", onClick: () => { unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
                                             ),
-                                            React.createElement("button", { type: "button", onClick: () => { setIsRosterModalOpen(true); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
-                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (.json)"
+                                            React.createElement("button", { type: "button", onClick: () => { rosterInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (JSON/Word)"
+                                            ),
+                                            React.createElement("button", { type: "button", onClick: () => { exportRosterWordTemplate(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(DownloadIcon, { className: 'w-4 h-4' }), " Plantilla Rol de Guardia (Word)"
                                             ),
                                             React.createElement("button", { type: "button", onClick: () => { openTemplateModal({ mode: 'add', serviceType: 'common' }); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(BookmarkIcon, { className: 'w-4 h-4' }), " Añadir desde Plantilla"
@@ -888,7 +909,6 @@ const App: React.FC = () => {
                 renderContent()
             ),
             isHelpModalOpen && React.createElement(HelpModal, { isOpen: isHelpModalOpen, onClose: () => setIsHelpModalOpen(false), unitList: unitList, commandPersonnel: commandPersonnel, servicePersonnel: servicePersonnel }),
-            isRosterModalOpen && React.createElement(RosterImportModal, { isOpen: isRosterModalOpen, onClose: () => setIsRosterModalOpen(false), onConfirm: () => rosterInputRef.current?.click() }),
             isTemplateModalOpen && React.createElement(ServiceTemplateModal, { isOpen: isTemplateModalOpen, onClose: () => setIsTemplateModalOpen(false), templates: serviceTemplates, onSelectTemplate: (template) => handleSelectTemplate(template, templateModalProps), onDeleteTemplate: handleDeleteTemplate }),
             isExportTemplateModalOpen && React.createElement(ExportTemplateModal, { isOpen: isExportTemplateModalOpen, onClose: () => setIsExportTemplateModalOpen(false), onExport: handleExportAsTemplate })
         )

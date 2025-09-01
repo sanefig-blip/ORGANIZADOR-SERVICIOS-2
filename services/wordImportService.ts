@@ -1,6 +1,6 @@
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
-import { Service, Assignment, Schedule, Officer, Rank, FireUnit, UnitGroup, Zone, UnitReportData } from '../types';
+import { Service, Assignment, Schedule, Officer, Rank, FireUnit, UnitGroup, Zone, UnitReportData, Roster } from '../types';
 
 const MONTH_NAMES: { [key: string]: number } = { "ENERO": 0, "FEBRERO": 1, "MARZO": 2, "ABRIL": 3, "MAYO": 4, "JUNIO": 5, "JULIO": 6, "AGOSTO": 7, "SEPTIEMBRE": 8, "OCTUBRE": 9, "NOVIEMBRE": 10, "DICIEMBRE": 11 };
 
@@ -467,3 +467,44 @@ export const parseScheduleFromFile = async (fileBuffer: ArrayBuffer, fileName: s
     }
     return null;
 };
+
+export async function parseRosterFromWord(fileBuffer: ArrayBuffer): Promise<Roster> {
+    const result = await mammoth.extractRawText({ arrayBuffer: fileBuffer });
+    const lines = result.value.split('\n').map(l => l.trim()).filter(l => l);
+
+    const roster: Roster = {};
+    let currentDate: Date | null = null;
+    const rolesMap: { [key: string]: keyof Roster[string] } = {
+        'JEFE DE INSPECCIONES': 'jefeInspecciones',
+        'JEFE DE SERVICIO': 'jefeServicio',
+        'JEFE DE GUARDIA': 'jefeGuardia',
+        'JEFE DE RESERVA': 'jefeReserva'
+    };
+
+    for (const line of lines) {
+        const dateMatch = line.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dateMatch) {
+            const [, day, month, year] = dateMatch;
+            // Note: JS Date month is 0-indexed
+            currentDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+            continue;
+        }
+
+        if (currentDate) {
+            const roleMatch = line.match(/^(JEFE DE (?:INSPECCIONES|SERVICIO|GUARDIA|RESERVA))\s*:\s*(.+)$/i);
+            if (roleMatch) {
+                const [, role, name] = roleMatch;
+                const roleKey = rolesMap[role.toUpperCase()];
+                if (roleKey) {
+                    const dateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+                    if (!roster[dateKey]) {
+                        roster[dateKey] = {};
+                    }
+                    roster[dateKey]![roleKey] = name.trim();
+                }
+            }
+        }
+    }
+
+    return roster;
+}

@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons.tsx';
-import { exportExcelTemplate, exportWordTemplate } from '../services/exportService.ts';
+import { exportExcelTemplate, exportWordTemplate, exportRosterWordTemplate } from '../services/exportService.ts';
 import { Personnel } from '../types.ts';
 
 interface HelpModalProps {
@@ -56,7 +57,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList, comman
             </ul>
           </section>
           <section>
-            <h3 className="text-xl font-semibold text-blue-300 mb-3">Importar Archivo (Excel o Word)</h3>
+            <h3 className="text-xl font-semibold text-blue-300 mb-3">Importar Horario (Excel o Word)</h3>
             <p className="mb-4">
               Esta función permite añadir o reemplazar los servicios actuales cargando un archivo Excel (<code className="bg-zinc-900 px-1 rounded">.xlsx</code>) o Word (<code className="bg-zinc-900 px-1 rounded">.docx</code>). Al seleccionar el archivo, la aplicación te preguntará si deseas <strong className="text-white">"Añadir"</strong> los nuevos servicios a los existentes o <strong className="text-white">"Reemplazar"</strong> todo el horario.
             </p>
@@ -93,6 +94,25 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList, comman
                 onClick={() => exportWordTemplate({ unitList, commandPersonnel, servicePersonnel })}
                 aria-label="Descargar plantilla de Word de ejemplo"
               ><DownloadIcon className="w-5 h-5"/>Descargar Plantilla Word</button>
+            </div>
+          </section>
+          <section>
+            <h3 className="text-xl font-semibold text-blue-300 mb-3">Importar Rol de Guardia</h3>
+            <p className="mb-4">
+              Puedes importar el rol de guardia mensual desde un archivo <code className="bg-zinc-900 px-1 rounded">.json</code> o un documento de Word (<code className="bg-zinc-900 px-1 rounded">.docx</code>). Si tienes el rol en un PDF, primero conviértelo a formato Word.
+            </p>
+            <h4 className="font-semibold text-white mb-2">Formato del Archivo Word:</h4>
+            <p className="mb-3">El documento debe tener fechas en formato <code className="bg-zinc-900 px-1 rounded">DD/MM/AAAA</code> y debajo, las asignaciones con el formato <code className="bg-zinc-900 px-1 rounded">ROL: Nombre Apellido</code>.</p>
+            <div className="bg-zinc-900/50 p-4 rounded-md border border-zinc-700 font-mono text-xs">
+                <p>01/08/2025</p>
+                <p><span className="text-yellow-300">JEFE DE SERVICIO:</span> APELLIDO, Nombre</p>
+                <p><span className="text-yellow-300">JEFE DE GUARDIA:</span> OTRO APELLIDO, Nombre</p>
+            </div>
+             <div className="mt-6 flex flex-wrap gap-4">
+              <button
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-md transition-colors"
+                onClick={() => exportRosterWordTemplate()}
+              ><DownloadIcon className="w-5 h-5"/>Descargar Plantilla Word para Rol</button>
             </div>
           </section>
           <section>
