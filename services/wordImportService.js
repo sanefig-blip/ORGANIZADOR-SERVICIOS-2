@@ -123,25 +123,28 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
     const processBlock = (startRow, endRow, colOffset) => {
         let stationName = null;
         let stationRawName = null;
+        
+        const blockStartKeywords = [
+            'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTACAMENTO', 'BRIGADA', 
+            'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
+        ];
 
-        // Find the station name in the first few rows of the block
         for (let r = startRow; r < Math.min(startRow + 5, endRow); r++) {
             const cellValue = rows[r]?.[colOffset];
-            if (cellValue && (String(cellValue).toUpperCase().startsWith('ESTACION') || String(cellValue).toUpperCase().startsWith('DTO'))) {
-                stationRawName = String(cellValue).trim();
-                
-                // Normalize the name
-                stationName = stationRawName
-                    .replace(/\s*"/g, ' ') // remove quotes
-                    .replace(/\s+/g, ' ') // collapse spaces
-                    .trim();
-
-                break;
+            if (cellValue) {
+                const upperCellValue = String(cellValue).toUpperCase().trim();
+                if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
+                    stationRawName = String(cellValue).trim();
+                    stationName = stationRawName
+                        .replace(/\s*"/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    break;
+                }
             }
         }
         
         if (!stationName) {
-            // This might happen for blocks like "JEFE DE INSPECCIONES" which we can ignore
             return;
         }
 
@@ -154,37 +157,39 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
             const type = row[colOffset + 0] ? String(row[colOffset + 0]).trim() : '';
             const id = row[colOffset + 1] ? String(row[colOffset + 1]).trim() : '';
             
-            // Heuristic to identify a unit row
             if (type && id && id.length > 2 && !type.toUpperCase().startsWith('ESTACION') && !type.toUpperCase().startsWith('DTO') && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
                 const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim();
-                const details = String(row[colOffset + 3] || '').trim();
+                const officerNameOrReason = String(row[colOffset + 3] || '').trim();
+                const personnelCountRaw = row[colOffset + 4];
+                const poc = String(row[colOffset + 5] || '').trim();
 
                 let status = 'Para Servicio';
                 let outOfServiceReason = undefined;
-                let officerInCharge = details;
-                
-                // More robust status detection
+                let officerInCharge = undefined;
+                let personnelCount = null;
+
                 if (statusRaw.toUpperCase().includes('F/S')) {
                     status = 'Fuera de Servicio';
-                    officerInCharge = undefined;
-                    // Extract reason from details if available
-                    outOfServiceReason = details || statusRaw.replace(/F\/S/i, '').trim() || undefined;
+                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/F\/S/i, '').trim() || undefined;
                 } else if (statusRaw.toUpperCase().includes('RESERVA')) {
                     status = 'Reserva';
-                    officerInCharge = undefined; 
                 } else if (statusRaw.toUpperCase().includes('A/P')) {
                     status = 'A Préstamo';
-                    officerInCharge = undefined;
-                    outOfServiceReason = details || statusRaw.replace(/A\/P/i, '').trim() || undefined;
-                } else if (details) {
-                     officerInCharge = details;
+                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/A\/P/i, '').trim() || undefined;
                 } else {
-                     officerInCharge = statusRaw;
+                    status = 'Para Servicio';
+                    if (poc) {
+                        officerInCharge = poc;
+                    } else if (officerNameOrReason && !['PARA SERVICIO', 'P/S'].includes(officerNameOrReason.toUpperCase())) {
+                        officerInCharge = officerNameOrReason;
+                    }
                 }
 
-                // If officerInCharge is one of the statuses, clear it
-                if (['PARA SERVICIO', 'FUERA DE SERVICIO', 'RESERVA', 'A PRÉSTAMO'].includes((officerInCharge || '').toUpperCase())) {
-                    officerInCharge = undefined;
+                if (personnelCountRaw !== null && personnelCountRaw !== undefined && String(personnelCountRaw).trim() !== '') {
+                    const count = parseInt(String(personnelCountRaw), 10);
+                    if (!isNaN(count)) {
+                        personnelCount = count;
+                    }
                 }
                 
                 group.units.push({
@@ -193,7 +198,7 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
                     status,
                     officerInCharge: officerInCharge || undefined,
                     outOfServiceReason,
-                    personnelCount: null, // This info is not in the provided excel
+                    personnelCount,
                 });
             }
         }
@@ -202,7 +207,6 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
         }
     };
     
-    // Find starting points of each station/destacamento block
     const blockStarts = [];
     const blockStartKeywords = [
         'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTACAMENTO', 'BRIGADA', 
@@ -216,7 +220,6 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
                 if (cellValue) {
                     const upperCellValue = String(cellValue).toUpperCase().trim();
                     if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
-                       // Avoid adding duplicates if a name spans multiple cells
                        if (!blockStarts.some(bs => bs.row === r)) {
                            blockStarts.push({row: r, col: c});
                        }
@@ -226,18 +229,15 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
         }
     });
     
-    // Sort blocks by row then column to process in order
     blockStarts.sort((a, b) => a.row - b.row || a.col - b.col);
 
     for (let i = 0; i < blockStarts.length; i++) {
         const start = blockStarts[i];
-        // Find the start of the next block to determine the end of the current one
         const nextBlock = blockStarts[i + 1];
         const endRow = nextBlock ? nextBlock.row : rows.length;
         processBlock(start.row, endRow, start.col);
     }
     
-    // Hardcoded zones based on the provided excel structure. This is brittle but necessary without more info.
     const ZONES_LAYOUT = {
         "ZONA I": ["ESTACION I", "ESTACION II", "DTO. POMPEYA", "ESTACION III", "DTO. BOCA", "ESTACION X"],
         "ZONA II": ["ESTACION IV", "DTO. MISERERE", "DTO. RETIRO", "ESTACION V", "DTO. URQUIZA", "DTO. SAAVEDRA", "ESTACION VI", "DTO. PALERMO", "DTO. CHACARITA"],
@@ -277,7 +277,6 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
         }
         if (!assigned) {
              console.warn(`Could not assign station "${groupName}" (${normalizedGroupName}) to a zone.`);
-             // As a fallback, try to find a partial match
              for (const zone of zones) {
                 if (ZONES_LAYOUT[zone.name].some(prefix => {
                     const simplifiedPrefix = prefix.toUpperCase().replace(/\./g, "").replace("ESTACION", "").trim();
