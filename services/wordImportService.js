@@ -202,7 +202,7 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
         }
     };
     
-    const blockStarts = [];
+    const blockStartsByRow = new Map();
     const blockStartKeywords = [
         'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
         'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
@@ -215,8 +215,11 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
                 if (cellValue) {
                     const upperCellValue = String(cellValue).toUpperCase().trim();
                     if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
-                       if (!blockStarts.some(bs => bs.row === r && bs.col === c)) {
-                           blockStarts.push({row: r, col: c});
+                       if (!blockStartsByRow.has(r)) {
+                           blockStartsByRow.set(r, []);
+                       }
+                       if (!blockStartsByRow.get(r).includes(c)) {
+                           blockStartsByRow.get(r).push(c);
                        }
                     }
                 }
@@ -224,13 +227,18 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
         }
     });
     
-    blockStarts.sort((a, b) => a.row - b.row || a.col - b.col);
+    const sortedRowKeys = Array.from(blockStartsByRow.keys()).sort((a, b) => a - b);
 
-    for (let i = 0; i < blockStarts.length; i++) {
-        const start = blockStarts[i];
-        const nextBlockOnNewRow = blockStarts.find(bs => bs.row > start.row);
-        const endRow = nextBlockOnNewRow ? nextBlockOnNewRow.row : rows.length;
-        processBlock(start.row, endRow, start.col);
+    for (let i = 0; i < sortedRowKeys.length; i++) {
+        const currentRow = sortedRowKeys[i];
+        const nextRowKey = (i + 1 < sortedRowKeys.length) ? sortedRowKeys[i + 1] : rows.length;
+        const endRow = nextRowKey;
+
+        const colsOnThisRow = blockStartsByRow.get(currentRow).sort((a, b) => a - b);
+
+        for (const currentCol of colsOnThisRow) {
+            processBlock(currentRow, endRow, currentCol);
+        }
     }
     
     const ZONES_LAYOUT = {
