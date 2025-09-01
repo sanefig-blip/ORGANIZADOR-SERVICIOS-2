@@ -205,15 +205,23 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
     
     // Find starting points of each station/destacamento block
     const blockStarts: {row: number, col: number}[] = [];
+    const blockStartKeywords = [
+        'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTACAMENTO', 'BRIGADA', 
+        'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
+    ];
+
     rows.forEach((row, r) => {
         if (row) {
             [0, 4, 9].forEach(c => { // Check column A, E, J
                 const cellValue = row[c];
-                if (cellValue && (String(cellValue).toUpperCase().startsWith('ESTACION') || String(cellValue).toUpperCase().startsWith('DTO'))) {
-                   // Avoid adding duplicates if a name spans multiple cells
-                   if (!blockStarts.some(bs => bs.row === r)) {
-                       blockStarts.push({row: r, col: c});
-                   }
+                if (cellValue) {
+                    const upperCellValue = String(cellValue).toUpperCase().trim();
+                    if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
+                       // Avoid adding duplicates if a name spans multiple cells
+                       if (!blockStarts.some(bs => bs.row === r)) {
+                           blockStarts.push({row: r, col: c});
+                       }
+                    }
                 }
             });
         }
