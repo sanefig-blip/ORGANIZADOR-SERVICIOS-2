@@ -156,20 +156,24 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
             if (type && id && id.length > 2 && !blockStartKeywords.some(k => type.toUpperCase().startsWith(k)) && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
                 const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim().toUpperCase();
                 const officerName = String(row[colOffset + 3] || '').trim();
-                const personnelCountRaw = row[colOffset + 4];
-                const pocRaw = String(row[colOffset + 5] || '').trim();
+                const pocRaw = String(row[colOffset + 4] || '').trim();
+                const personnelCountRaw = row[colOffset + 5];
 
                 let status = 'Para Servicio';
                 let outOfServiceReason: string | undefined = undefined;
-                let officerInCharge: string | undefined = officerName || undefined;
-                let poc: string | undefined = pocRaw || undefined;
+                let officerInCharge: string | undefined = undefined;
+                let poc: string | undefined = undefined;
                 let personnelCount: number | null = null;
                 
                 if (statusRaw.includes('F/S')) {
                     status = 'Fuera de Servicio';
                     outOfServiceReason = officerName || statusRaw.replace(/F\/S/i, '').trim() || undefined;
-                    officerInCharge = undefined; // Clear officer if out of service
+                    officerInCharge = undefined;
+                    poc = undefined;
                 } else {
+                    officerInCharge = officerName || undefined;
+                    poc = pocRaw || undefined;
+
                     if (statusRaw.includes('RESERVA')) {
                         status = 'Reserva';
                     } else if (statusRaw.includes('A/P') || statusRaw.includes('A PRÉSTAMO')) {
@@ -205,7 +209,7 @@ export const parseFullUnitReportFromExcel = (fileBuffer: ArrayBuffer): UnitRepor
         'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
         'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
     ];
-    const columnsToScan = [0, 6, 12]; // Adjusted column scan indices
+    const columnsToScan = [0, 6, 12];
 
     rows.forEach((row, r) => {
         if (row) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { ChevronDownIcon, SearchIcon, PencilIcon, XCircleIcon, TrashIcon, PlusCircleIcon, DownloadIcon } from './icons.js';
 import { exportUnitReportToPdf } from '../services/exportService.js';
@@ -77,6 +76,7 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
          type: 'Tipo',
          status: 'Para Servicio',
          officerInCharge: '',
+         poc: '',
          personnelCount: null,
          internalId: ''
        };
@@ -163,7 +163,8 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
             unit.type.toLowerCase().includes(lowercasedFilter) ||
             unit.status.toLowerCase().includes(lowercasedFilter) ||
             (unit.internalId || '').toLowerCase().includes(lowercasedFilter) ||
-            (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter)
+            (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter) ||
+            (unit.poc || '').toLowerCase().includes(lowercasedFilter)
           );
         }).map(group => ({
             ...group,
@@ -176,7 +177,8 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
                 unit.type.toLowerCase().includes(lowercasedFilter) ||
                 unit.status.toLowerCase().includes(lowercasedFilter) ||
                 (unit.internalId || '').toLowerCase().includes(lowercasedFilter) ||
-                (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter)
+                (unit.officerInCharge || '').toLowerCase().includes(lowercasedFilter) ||
+                (unit.poc || '').toLowerCase().includes(lowercasedFilter)
             )
         }));
         return { ...zone, groups: filteredGroups };
@@ -384,6 +386,7 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
                                 React.createElement("th", { className: "p-2" }, "Tipo"),
                                 React.createElement("th", { className: "p-2" }, "Estado"),
                                 React.createElement("th", { className: "p-2" }, "Oficial a Cargo"),
+                                React.createElement("th", { className: "p-2" }, "POC"),
                                 React.createElement("th", { className: "p-2 text-right w-24" }, "Personal"),
                                 isEditing && React.createElement("th", { className: "p-2 w-12", "aria-label": "Acciones" })
                               )
@@ -493,6 +496,14 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
                                         );
                                     })()
                                   ),
+                                  React.createElement("td", { className: "p-2 text-zinc-300" },
+                                     isEditing ? (
+                                      React.createElement("input", {
+                                        type: "text", value: unit.poc || '',
+                                        onChange: (e) => handleUnitChange(zoneIdx, groupIdx, unitIdx, 'poc', e.target.value),
+                                        className: "w-full bg-zinc-700 border-zinc-600 rounded-md px-2 py-1 text-white"})
+                                    ) : (unit.poc || '-')
+                                  ),
                                   React.createElement("td", { className: "p-2 text-right text-zinc-200 font-semibold" },
                                     isEditing ? (
                                         React.createElement("input", {
@@ -521,7 +532,7 @@ const UnitReportDisplay = ({ reportData, searchTerm, onSearchChange, onUpdateRep
                              isEditing && (
                                 React.createElement("tfoot", null,
                                     React.createElement("tr", null,
-                                        React.createElement("td", { colSpan: 7, className: "pt-2" },
+                                        React.createElement("td", { colSpan: 8, className: "pt-2" },
                                             React.createElement("button", {
                                                 type: "button",
                                                 onClick: () => handleAddUnit(zoneIdx, groupIdx),
