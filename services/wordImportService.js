@@ -122,23 +122,18 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
 
     const processBlock = (startRow, endRow, colOffset) => {
         let stationName = null;
-        let stationRawName = null;
         
         const blockStartKeywords = [
-            'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTACAMENTO', 'BRIGADA', 
-            'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
+            'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
+            'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
         ];
 
         for (let r = startRow; r < Math.min(startRow + 5, endRow); r++) {
             const cellValue = rows[r]?.[colOffset];
-            if (cellValue) {
+             if (cellValue) {
                 const upperCellValue = String(cellValue).toUpperCase().trim();
                 if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
-                    stationRawName = String(cellValue).trim();
-                    stationName = stationRawName
-                        .replace(/\s*"/g, ' ')
-                        .replace(/\s+/g, ' ')
-                        .trim();
+                    stationName = String(cellValue).trim().replace(/\s+/g, ' ').trim();
                     break;
                 }
             }
@@ -157,8 +152,8 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
             const type = row[colOffset + 0] ? String(row[colOffset + 0]).trim() : '';
             const id = row[colOffset + 1] ? String(row[colOffset + 1]).trim() : '';
             
-            if (type && id && id.length > 2 && !type.toUpperCase().startsWith('ESTACION') && !type.toUpperCase().startsWith('DTO') && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
-                const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim();
+            if (type && id && id.length > 2 && !blockStartKeywords.some(k => type.toUpperCase().startsWith(k)) && !type.toUpperCase().startsWith('TOTAL') && !type.toUpperCase().startsWith('DEPEN')) {
+                const statusRaw = String(row[colOffset + 2] || 'Para Servicio').trim().toUpperCase();
                 const officerNameOrReason = String(row[colOffset + 3] || '').trim();
                 const personnelCountRaw = row[colOffset + 4];
                 const poc = String(row[colOffset + 5] || '').trim();
@@ -167,23 +162,23 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
                 let outOfServiceReason = undefined;
                 let officerInCharge = undefined;
                 let personnelCount = null;
-
-                if (statusRaw.toUpperCase().includes('F/S')) {
+                
+                if (statusRaw.includes('F/S')) {
                     status = 'Fuera de Servicio';
                     outOfServiceReason = officerNameOrReason || statusRaw.replace(/F\/S/i, '').trim() || undefined;
-                } else if (statusRaw.toUpperCase().includes('RESERVA')) {
+                } else if (statusRaw.includes('RESERVA')) {
                     status = 'Reserva';
-                } else if (statusRaw.toUpperCase().includes('A/P')) {
+                    if (poc) officerInCharge = poc;
+                    else if (officerNameOrReason) officerInCharge = officerNameOrReason;
+                } else if (statusRaw.includes('A/P') || statusRaw.includes('A PRÉSTAMO')) {
                     status = 'A Préstamo';
-                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/A\/P/i, '').trim() || undefined;
-                } else {
+                    outOfServiceReason = officerNameOrReason || statusRaw.replace(/A\/P|A PRÉSTAMO/i, '').trim() || undefined;
+                } else { // Includes "PARA SERVICIO"
                     status = 'Para Servicio';
-                    if (poc) {
-                        officerInCharge = poc;
-                    } else if (officerNameOrReason && !['PARA SERVICIO', 'P/S'].includes(officerNameOrReason.toUpperCase())) {
-                        officerInCharge = officerNameOrReason;
-                    }
+                    if (poc) officerInCharge = poc;
+                    else if (officerNameOrReason) officerInCharge = officerNameOrReason;
                 }
+
 
                 if (personnelCountRaw !== null && personnelCountRaw !== undefined && String(personnelCountRaw).trim() !== '') {
                     const count = parseInt(String(personnelCountRaw), 10);
@@ -209,8 +204,8 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
     
     const blockStarts = [];
     const blockStartKeywords = [
-        'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTACAMENTO', 'BRIGADA', 
-        'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
+        'ESTACION', 'ESTACIÓN', 'DTO.', 'DESTAC.', 'DESTACAMENTO', 'BRIGADA', 
+        'OFICINA', 'COMPAÑIA', 'COMPANIA', 'DIVISIÓN', 'DIVISION', 'TRANSPORTE', 'URIP', 'O.C.O.B.'
     ];
 
     rows.forEach((row, r) => {
@@ -220,7 +215,7 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
                 if (cellValue) {
                     const upperCellValue = String(cellValue).toUpperCase().trim();
                     if (blockStartKeywords.some(keyword => upperCellValue.startsWith(keyword))) {
-                       if (!blockStarts.some(bs => bs.row === r)) {
+                       if (!blockStarts.some(bs => bs.row === r && bs.col === c)) {
                            blockStarts.push({row: r, col: c});
                        }
                     }
@@ -233,8 +228,8 @@ export const parseFullUnitReportFromExcel = (fileBuffer) => {
 
     for (let i = 0; i < blockStarts.length; i++) {
         const start = blockStarts[i];
-        const nextBlock = blockStarts[i + 1];
-        const endRow = nextBlock ? nextBlock.row : rows.length;
+        const nextBlockOnNewRow = blockStarts.find(bs => bs.row > start.row);
+        const endRow = nextBlockOnNewRow ? nextBlockOnNewRow.row : rows.length;
         processBlock(start.row, endRow, start.col);
     }
     
