@@ -482,6 +482,16 @@ export const exportUnitReportToPdf = (reportData) => {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 14;
 
+    // Embed data for re-importing
+    try {
+        const jsonData = JSON.stringify(reportData);
+        doc.setProperties({
+            subject: `unit-report-data:${jsonData}`
+        });
+    } catch (e) {
+        console.error("Failed to embed JSON data in PDF:", e);
+    }
+
     const drawPageHeader = () => {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');

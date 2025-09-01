@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons.tsx';
 import { exportExcelTemplate, exportWordTemplate, exportRosterWordTemplate } from '../services/exportService.ts';
@@ -43,17 +41,24 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList, comman
           <section>
             <h3 className="text-xl font-semibold text-blue-300 mb-3">Vistas Principales</h3>
             <ul className="list-disc list-inside space-y-2">
-              <li><strong className="text-white">Vista General:</strong> Muestra todos los servicios planificados. Aquí puedes editar, añadir, mover, ocultar y exportar los servicios del día.</li>
+              <li><strong className="text-white">Reporte de Unidades:</strong> Vista principal para ver y editar el estado de todas las unidades.</li>
+              <li><strong className="text-white">Planificador:</strong> Muestra todos los servicios planificados. Aquí puedes editar, añadir, mover, ocultar y exportar los servicios del día.</li>
               <li><strong className="text-white">Vista por Hora:</strong> Agrupa todas las asignaciones de los servicios visibles por su horario de inicio, facilitando la visualización cronológica de las tareas.</li>
-              <li><strong className="text-white">Nomencladores:</strong> Permite gestionar las listas predefinidas de "Personal" y "Unidades" que se utilizan en los menús desplegables al editar un servicio.</li>
+              <li><strong className="text-white">Nomencladores:</strong> Permite gestionar las listas predefinidas de "Personal" y "Unidades" que se utilizan en los menús desplegables.</li>
             </ul>
           </section>
           <section>
-            <h3 className="text-xl font-semibold text-blue-300 mb-3">Gestión de Servicios</h3>
+            <h3 className="text-xl font-semibold text-blue-300 mb-3">Reporte de Unidades (Importar/Exportar)</h3>
+            <p className="mb-2">
+                Puedes importar un reporte de unidades completo desde un archivo Excel (<code className="bg-zinc-900 px-1 rounded">.xlsx</code>) o un PDF (<code className="bg-zinc-900 px-1 rounded">.pdf</code>) que haya sido generado previamente por esta aplicación.
+            </p>
+            <p className="mb-4">
+                <strong className="text-white">Importante:</strong> La importación reemplazará todo el reporte de unidades actual.
+            </p>
             <ul className="list-disc list-inside space-y-2">
-              <li><strong className="text-white">Añadir/Editar:</strong> Usa el botón "Añadir Servicio" o el ícono del lápiz en un servicio existente. Puedes modificar títulos, descripciones, novedades y cada detalle de las asignaciones.</li>
-              <li><strong className="text-white">Mover:</strong> Utiliza las flechas arriba y abajo en cada servicio para reordenarlos en la vista general.</li>
-              <li><strong className="text-white">Seleccionar y Ocultar/Mostrar:</strong> Marca la casilla de uno o más servicios. Aparecerá un botón para "Ocultar Seleccionados". Los servicios ocultos no se mostrarán en las vistas ni en las exportaciones, pero puedes seleccionarlos desde la sección "Servicios Ocultos" para volver a mostrarlos.</li>
+              <li><strong className="text-white">Importar PDF:</strong> Es la forma más fiable. Solo funciona con archivos PDF exportados desde esta misma aplicación, ya que los datos se guardan internamente en el archivo.</li>
+              <li><strong className="text-white">Importar Excel:</strong> La aplicación intentará leer la estructura de tu archivo Excel. Funciona mejor si el archivo tiene un formato similar al reporte estándar.</li>
+              <li><strong className="text-white">Exportar PDF:</strong> Genera un PDF del reporte actual, que puede ser compartido o archivado. Este PDF puede ser re-importado más tarde.</li>
             </ul>
           </section>
           <section>
@@ -114,13 +119,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, unitList, comman
                 onClick={() => exportRosterWordTemplate()}
               ><DownloadIcon className="w-5 h-5"/>Descargar Plantilla Word para Rol</button>
             </div>
-          </section>
-          <section>
-            <h3 className="text-xl font-semibold text-blue-300 mb-3">Exportar a Word</h3>
-            <ul className="list-disc list-inside space-y-2">
-              <li><strong className="text-white">Exportar General:</strong> Genera un documento <code className="bg-zinc-900 px-1 rounded">.docx</code> con el formato de la orden de servicio tradicional, incluyendo la línea de guardia y todos los servicios visibles.</li>
-              <li><strong className="text-white">Exportar por Hora:</strong> Genera un documento <code className="bg-zinc-900 px-1 rounded">.docx</code> que agrupa todas las asignaciones por hora, similar a la "Vista por Hora".</li>
-            </ul>
           </section>
           <section>
             <h3 className="text-xl font-semibold text-blue-300 mb-3">Controles Adicionales</h3>

@@ -503,3 +503,69 @@ export async function parseRosterFromWord(fileBuffer: ArrayBuffer): Promise<Rost
 
     return roster;
 }
+
+export const parseUnitReportFromPdf = async (fileBuffer: ArrayBuffer): Promise<UnitReportData | null> => {
+    try {
+        const decoder = new TextDecoder('latin1');
+        const pdfText = decoder.decode(fileBuffer);
+        
+        const prefix = 'unit-report-data:';
+        const subjectTag = '/Subject';
+        let startIndex = pdfText.indexOf(subjectTag);
+
+        if (startIndex === -1) {
+             console.warn("PDF does not contain /Subject tag.");
+             return null;
+        }
+
+        startIndex += subjectTag.length;
+        
+        while(startIndex < pdfText.length && /\s/.test(pdfText[startIndex])) {
+            startIndex++;
+        }
+        if (pdfText[startIndex] !== '(') {
+             console.warn("Could not find opening parenthesis for /Subject string.");
+             return null;
+        }
+        startIndex++;
+        
+        let balance = 1;
+        let endIndex = -1;
+
+        for (let i = startIndex; i < pdfText.length; i++) {
+            const char = pdfText[i];
+            if (char === '\\') {
+                i++;
+                continue;
+            }
+            if (char === '(') {
+                balance++;
+            } else if (char === ')') {
+                balance--;
+            }
+            if (balance === 0) {
+                endIndex = i;
+                break;
+            }
+        }
+        
+        if (endIndex !== -1) {
+            let fullSubject = pdfText.substring(startIndex, endIndex);
+            if (fullSubject.startsWith(prefix)) {
+                let jsonDataString = fullSubject.substring(prefix.length);
+                jsonDataString = jsonDataString.replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\');
+                const reportData = JSON.parse(jsonDataString);
+                
+                if (reportData && reportData.zones && Array.isArray(reportData.zones)) {
+                    return reportData as UnitReportData;
+                }
+            }
+        }
+        
+        console.warn("No valid unit report data found embedded in the PDF subject.");
+        return null;
+    } catch (error) {
+        console.error("Error parsing unit report from PDF:", error);
+        throw new Error("No se pudo procesar el archivo PDF. Asegúrese de que fue generado por esta aplicación y no ha sido modificado.");
+    }
+};

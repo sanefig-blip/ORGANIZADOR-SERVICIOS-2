@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { rankOrder } from './types.js';
 import { scheduleData as preloadedScheduleData } from './data/scheduleData.js';
@@ -12,7 +11,7 @@ import { servicePersonnelData as defaultServicePersonnel } from './data/serviceP
 import { defaultUnits } from './data/unitData.js';
 import { defaultServiceTemplates } from './data/serviceTemplates.js';
 import { exportScheduleToWord, exportScheduleByTimeToWord, exportScheduleAsExcelTemplate, exportScheduleAsWordTemplate, exportRosterWordTemplate } from './services/exportService.js';
-import { parseScheduleFromFile, parseFullUnitReportFromExcel, parseRosterFromWord } from './services/wordImportService.js';
+import { parseScheduleFromFile, parseFullUnitReportFromExcel, parseRosterFromWord, parseUnitReportFromPdf } from './services/wordImportService.js';
 import ScheduleDisplay from './components/ScheduleDisplay.js';
 import TimeGroupedScheduleDisplay from './components/TimeGroupedScheduleDisplay.js';
 import Nomenclador from './components/Nomenclador.js';
@@ -67,6 +66,7 @@ const App = () => {
     
     const fileInputRef = useRef(null);
     const unitReportFileInputRef = useRef(null);
+    const unitReportPdfFileInputRef = useRef(null);
     const rosterInputRef = useRef(null);
     const importMenuRef = useRef(null);
     const exportMenuRef = useRef(null);
@@ -631,6 +631,36 @@ const App = () => {
         }
     };
 
+    const handleUnitReportPdfImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (window.confirm("¿Está seguro de que desea reemplazar todo el reporte de unidades con los datos de este PDF? Esta acción no se puede deshacer.")) {
+            try {
+                const fileBuffer = await file.arrayBuffer();
+                const newUnitReportData = await parseUnitReportFromPdf(fileBuffer); 
+                
+                if (newUnitReportData) {
+                    handleUpdateUnitReport(newUnitReportData);
+                    showToast("Reporte de unidades importado desde PDF con éxito.");
+                } else {
+                    alert("No se pudo encontrar datos de reporte en el archivo PDF. Asegúrese de que el archivo fue generado por esta aplicación.");
+                }
+            } catch (error) {
+                console.error("Error al importar el reporte de unidades desde PDF:", error);
+                alert(`Hubo un error al procesar el archivo PDF: ${error.message}`);
+            } finally {
+                if (unitReportPdfFileInputRef.current) {
+                    unitReportPdfFileInputRef.current.value = '';
+                }
+            }
+        } else {
+             if (unitReportPdfFileInputRef.current) {
+                unitReportPdfFileInputRef.current.value = '';
+            }
+        }
+    };
+
     const handleRosterImport = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -825,6 +855,7 @@ const App = () => {
         React.createElement("div", { className: "bg-zinc-900 text-white min-h-screen font-sans" },
             React.createElement("input", { type: "file", ref: fileInputRef, onChange: handleFileImport, style: { display: 'none' }, accept: ".xlsx,.xls,.docx,.ods" }),
             React.createElement("input", { type: "file", ref: unitReportFileInputRef, onChange: handleUnitReportImport, style: { display: 'none' }, accept: ".xlsx,.xls" }),
+            React.createElement("input", { type: "file", ref: unitReportPdfFileInputRef, onChange: handleUnitReportPdfImport, style: { display: 'none' }, accept: ".pdf" }),
             React.createElement("input", { type: "file", ref: rosterInputRef, onChange: handleRosterImport, style: { display: 'none' }, accept: ".json,.docx" }),
             React.createElement("header", { className: "bg-zinc-800/80 backdrop-blur-sm sticky top-0 z-40 shadow-lg" },
                 React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
@@ -859,6 +890,9 @@ const App = () => {
                                             ),
                                             React.createElement("button", { type: "button", onClick: () => { unitReportFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (Excel)"
+                                            ),
+                                            React.createElement("button", { type: "button", onClick: () => { unitReportPdfFileInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
+                                                React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Reporte Unidades (PDF)"
                                             ),
                                             React.createElement("button", { type: "button", onClick: () => { rosterInputRef.current?.click(); setImportMenuOpen(false); }, className: "flex items-center gap-3 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-600 w-full text-left", role: "menuitem" },
                                                 React.createElement(UploadIcon, { className: 'w-4 h-4' }), " Importar Rol de Guardia (JSON/Word)"

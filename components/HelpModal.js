@@ -1,10 +1,7 @@
-
-
 import React from 'react';
 import { XIcon, DownloadIcon } from './icons.js';
 import { exportExcelTemplate, exportWordTemplate, exportRosterWordTemplate } from '../services/exportService.js';
 
-// FIX: Update component signature to accept personnel lists
 const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonnel }) => {
   if (!isOpen) {
     return null;
@@ -35,17 +32,24 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
           React.createElement("section", null,
             React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Vistas Principales"),
             React.createElement("ul", { className: "list-disc list-inside space-y-2" },
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Vista General:"), " Muestra todos los servicios planificados. Aquí puedes editar, añadir, mover, ocultar y exportar los servicios del día."),
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Reporte de Unidades:"), " Vista principal para ver y editar el estado de todas las unidades."),
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Planificador:"), " Muestra todos los servicios planificados. Aquí puedes editar, añadir, mover, ocultar y exportar los servicios del día."),
               React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Vista por Hora:"), " Agrupa todas las asignaciones de los servicios visibles por su horario de inicio, facilitando la visualización cronológica de las tareas."),
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Nomencladores:"), " Permite gestionar las listas predefinidas de \"Personal\" y \"Unidades\" que se utilizan en los menús desplegables al editar un servicio.")
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Nomencladores:"), " Permite gestionar las listas predefinidas de \"Personal\" y \"Unidades\" que se utilizan en los menús desplegables.")
             )
           ),
           React.createElement("section", null,
-            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Gestión de Servicios"),
+            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Reporte de Unidades (Importar/Exportar)"),
+            React.createElement("p", { className: "mb-2" },
+                "Puedes importar un reporte de unidades completo desde un archivo Excel (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".xlsx"), ") o un PDF (", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".pdf"), ") que haya sido generado previamente por esta aplicación."
+            ),
+            React.createElement("p", { className: "mb-4" },
+                React.createElement("strong", { className: "text-white" }, "Importante:"), " La importación reemplazará todo el reporte de unidades actual."
+            ),
             React.createElement("ul", { className: "list-disc list-inside space-y-2" },
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Añadir/Editar:"), " Usa el botón \"Añadir Servicio\" o el ícono del lápiz en un servicio existente. Puedes modificar títulos, descripciones, novedades y cada detalle de las asignaciones."),
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Mover:"), " Utiliza las flechas arriba y abajo en cada servicio para reordenarlos en la vista general."),
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Seleccionar y Ocultar/Mostrar:"), " Marca la casilla de uno o más servicios. Aparecerá un botón para \"Ocultar Seleccionados\". Los servicios ocultos no se mostrarán en las vistas ni en las exportaciones, pero puedes seleccionarlos desde la sección \"Servicios Ocultos\" para volver a mostrarlos.")
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Importar PDF:"), " Es la forma más fiable. Solo funciona con archivos PDF exportados desde esta misma aplicación, ya que los datos se guardan internamente en el archivo."),
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Importar Excel:"), " La aplicación intentará leer la estructura de tu archivo Excel. Funciona mejor si el archivo tiene un formato similar al reporte estándar."),
+              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar PDF:"), " Genera un PDF del reporte actual, que puede ser compartido o archivado. Este PDF puede ser re-importado más tarde.")
             )
           ),
           React.createElement("section", null,
@@ -105,13 +109,6 @@ const HelpModal = ({ isOpen, onClose, unitList, commandPersonnel, servicePersonn
                 className: "inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-md transition-colors",
                 onClick: () => exportRosterWordTemplate()
               }, React.createElement(DownloadIcon, { className: "w-5 h-5" }), "Descargar Plantilla Word para Rol")
-            )
-          ),
-          React.createElement("section", null,
-            React.createElement("h3", { className: "text-xl font-semibold text-blue-300 mb-3" }, "Exportar a Word"),
-            React.createElement("ul", { className: "list-disc list-inside space-y-2" },
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar General:"), " Genera un documento ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), " con el formato de la orden de servicio tradicional, incluyendo la línea de guardia y todos los servicios visibles."),
-              React.createElement("li", null, React.createElement("strong", { className: "text-white" }, "Exportar por Hora:"), " Genera un documento ", React.createElement("code", { className: "bg-zinc-900 px-1 rounded" }, ".docx"), " que agrupa todas las asignaciones por hora, similar a la \"Vista por Hora\".")
             )
           ),
           React.createElement("section", null,
