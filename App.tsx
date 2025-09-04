@@ -21,7 +21,8 @@ import CommandPostView from './components/CommandPostView.tsx';
 import EraReportDisplay from './components/EraReportDisplay.tsx';
 import GeneratorReportDisplay from './components/GeneratorReportDisplay.tsx';
 import MaterialsDisplay from './components/MaterialsDisplay.tsx';
-import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon } from './components/icons.tsx';
+import MaterialStatusView from './components/MaterialStatusView.tsx';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon, ClipboardCheckIcon } from './components/icons.tsx';
 import HelpModal from './components/HelpModal.tsx';
 import ServiceTemplateModal from './components/ServiceTemplateModal.tsx';
 import ExportTemplateModal from './components/ExportTemplateModal.tsx';
@@ -794,6 +795,11 @@ const App: React.FC = () => {
             case 'unit-status':
                 if (!unitReport) return null;
                 return React.createElement(UnitStatusView, { unitReportData: unitReport });
+            case 'material-status':
+                if (!materialsReport) return null;
+                return React.createElement(MaterialStatusView, {
+                    materialsData: materialsReport,
+                });
             case 'command-post':
                 if (!unitReport) return null;
                 return React.createElement(CommandPostView, { unitReportData: unitReport });
@@ -868,6 +874,7 @@ const App: React.FC = () => {
                         React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },
                             React.createElement("button", { className: getButtonClass('unit-report'), onClick: () => setView('unit-report') }, React.createElement(FireIcon, { className: "w-5 h-5" }), " Reporte de Unidades"),
                             React.createElement("button", { className: getButtonClass('unit-status'), onClick: () => setView('unit-status') }, React.createElement(FilterIcon, { className: "w-5 h-5" }), " Estado de Unidades"),
+                            React.createElement("button", { className: getButtonClass('material-status'), onClick: () => setView('material-status') }, React.createElement(ClipboardCheckIcon, { className: "w-5 h-5" }), " Estado de Materiales"),
                             React.createElement("button", { className: getButtonClass('command-post'), onClick: () => setView('command-post') }, React.createElement(AnnotationIcon, { className: "w-5 h-5" }), " Puesto Comando"),
                             React.createElement("button", { className: getButtonClass('era-report'), onClick: () => setView('era-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Trasvazadores E.R.A."),
                             React.createElement("button", { className: getButtonClass('generator-report'), onClick: () => setView('generator-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Grupos Electrógenos"),

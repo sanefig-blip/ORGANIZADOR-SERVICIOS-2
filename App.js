@@ -21,7 +21,8 @@ import CommandPostView from './components/CommandPostView.js';
 import EraReportDisplay from './components/EraReportDisplay.js';
 import GeneratorReportDisplay from './components/GeneratorReportDisplay.js';
 import MaterialsDisplay from './components/MaterialsDisplay.js';
-import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon } from './components/icons.js';
+import MaterialStatusView from './components/MaterialStatusView.js';
+import { BookOpenIcon, DownloadIcon, ClockIcon, ClipboardListIcon, RefreshIcon, EyeIcon, EyeOffIcon, UploadIcon, QuestionMarkCircleIcon, BookmarkIcon, ChevronDownIcon, FireIcon, FilterIcon, AnnotationIcon, LightningBoltIcon, MapIcon, CubeIcon, ClipboardCheckIcon } from './components/icons.js';
 import HelpModal from './components/HelpModal.js';
 import ServiceTemplateModal from './components/ServiceTemplateModal.js';
 import ExportTemplateModal from './components/ExportTemplateModal.js';
@@ -630,7 +631,7 @@ const App = () => {
             }
         }
     };
-
+    
     const handleUnitReportPdfImport = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -794,6 +795,11 @@ const App = () => {
             case 'unit-status':
                 if (!unitReport) return null;
                 return React.createElement(UnitStatusView, { unitReportData: unitReport });
+            case 'material-status':
+                if (!materialsReport) return null;
+                return React.createElement(MaterialStatusView, {
+                    materialsData: materialsReport,
+                });
             case 'command-post':
                 if (!unitReport) return null;
                 return React.createElement(CommandPostView, { unitReportData: unitReport });
@@ -868,6 +874,7 @@ const App = () => {
                         React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2" },
                             React.createElement("button", { className: getButtonClass('unit-report'), onClick: () => setView('unit-report') }, React.createElement(FireIcon, { className: "w-5 h-5" }), " Reporte de Unidades"),
                             React.createElement("button", { className: getButtonClass('unit-status'), onClick: () => setView('unit-status') }, React.createElement(FilterIcon, { className: "w-5 h-5" }), " Estado de Unidades"),
+                            React.createElement("button", { className: getButtonClass('material-status'), onClick: () => setView('material-status') }, React.createElement(ClipboardCheckIcon, { className: "w-5 h-5" }), " Estado de Materiales"),
                             React.createElement("button", { className: getButtonClass('command-post'), onClick: () => setView('command-post') }, React.createElement(AnnotationIcon, { className: "w-5 h-5" }), " Puesto Comando"),
                             React.createElement("button", { className: getButtonClass('era-report'), onClick: () => setView('era-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Trasvazadores E.R.A."),
                             React.createElement("button", { className: getButtonClass('generator-report'), onClick: () => setView('generator-report') }, React.createElement(LightningBoltIcon, { className: "w-5 h-5" }), " Grupos Electrógenos"),

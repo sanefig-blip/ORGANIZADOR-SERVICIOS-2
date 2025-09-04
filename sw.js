@@ -22,6 +22,7 @@ const urlsToCache = [
   './components/GeneratorReportDisplay.js',
   './components/Croquis.js',
   './components/MaterialsDisplay.js',
+  './components/MaterialStatusView.js',
   './services/geminiService.js',
   './services/exportService.js',
   './services/wordImportService.js',

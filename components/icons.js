@@ -196,6 +196,13 @@ export const ClipboardCopyIcon = ({ className }) => (
   )
 );
 
+export const ClipboardCheckIcon = ({ className }) => (
+    React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2 },
+      React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" }),
+      React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 14l2 2 4-4" })
+    )
+);
+
 export const EngineIcon = ({ className }) => (
     React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 24 24", fill: "currentColor" },
         React.createElement("path", { d: "M19.5,8c-0.28,0-0.5,0.22-0.5,0.5v1.5H5v-1.5C5,8.22,4.78,8,4.5,8S4,8.22,4,8.5v2C4,11.22,4.22,11.5,4.5,11.5h15 c0.28,0,0.5-0.22,0.5-0.5v-2C20,8.22,19.78,8,19.5,8z M18,12H6c-1.1,0-2,0.9-2,2v2h2v-2h12v2h2v-2C20,12.9,19.1,12,18,12z M7.5,15 C6.67,15,6,15.67,6,16.5S6.67,18,7.5,18S9,17.33,9,16.5S8.33,15,7.5,15z M16.5,15c-0.83,0-1.5,0.67-1.5,1.5s0.67,1.5,1.5,1.5 s1.5-0.67,1.5-1.5S17.33,15,16.5,15z" }),
