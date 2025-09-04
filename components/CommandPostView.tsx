@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { UnitReportData, SCI201Data, SCI211Resource, SCI207Victim, TriageCategory } from '../types';
 import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons';
 import { exportCommandPostToPdf } from '../services/exportService';
@@ -55,7 +55,7 @@ interface CommandPostViewProps {
 
 const CommandPostView: React.FC<CommandPostViewProps> = ({ unitReportData }) => {
     const [activeTab, setActiveTab] = useState('control');
-    const [croquisSketch, setCroquisSketch] = useState<string | null>(null);
+    const croquisRef = useRef<{ getCenteredSketch: () => Promise<string | null> }>(null);
 
     const allUnitsForTracking = useMemo(() => {
         if (!unitReportData) return [];
@@ -199,7 +199,8 @@ const CommandPostView: React.FC<CommandPostViewProps> = ({ unitReportData }) => 
         '': 'bg-zinc-600 text-white'
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        const croquisSketch = await croquisRef.current?.getCenteredSketch();
         exportCommandPostToPdf(
             incidentDetails,
             trackedUnits,
@@ -310,7 +311,7 @@ const CommandPostView: React.FC<CommandPostViewProps> = ({ unitReportData }) => 
 
             {activeTab === 'croquis' && (
                 <div className="animate-fade-in">
-                    <Croquis onSketchChange={setCroquisSketch} isActive={activeTab === 'croquis'} />
+                    <Croquis ref={croquisRef} isActive={activeTab === 'croquis'} />
                 </div>
             )}
             

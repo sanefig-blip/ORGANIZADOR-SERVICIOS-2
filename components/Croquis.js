@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { TrashIcon, EngineIcon, LadderIcon, AmbulanceIcon, CommandPostIcon, PersonIcon, CrosshairsIcon, MaximizeIcon, MinimizeIcon, SearchIcon, ArrowUturnLeftIcon } from './icons.js';
 import { streets } from '../data/streets.js';
 
-const Croquis = ({ onSketchChange, isActive }) => {
+const Croquis = forwardRef(({ isActive }, ref) => {
     const containerRef = useRef(null);
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
@@ -27,23 +27,85 @@ const Croquis = ({ onSketchChange, isActive }) => {
     
     const history = useRef([]);
 
-    const updateSketch = useCallback(() => {
-        if (mapContainerRef.current && mapRef.current) {
-            html2canvas(mapContainerRef.current, {
-                useCORS: true,
-                backgroundColor: '#18181b',
-                logging: false,
-                onclone: (doc) => {
-                    const attribution = doc.querySelector('.leaflet-control-attribution');
-                    if (attribution) attribution.style.display = 'none';
-                    const editor = doc.getElementById('radius-editor');
-                    if(editor) editor.style.display = 'none';
+    const updateSketch = useCallback(async (forceCapture = false) => {
+      if (!mapRef.current || !mapContainerRef.current) return null;
+      try {
+        const canvas = await html2canvas(mapContainerRef.current, {
+            useCORS: true,
+            backgroundColor: '#18181b',
+            logging: false,
+            onclone: (doc) => {
+                const attribution = doc.querySelector('.leaflet-control-attribution');
+                if (attribution) attribution.style.display = 'none';
+                const editor = doc.getElementById('radius-editor');
+                if(editor) editor.style.display = 'none';
+                
+                const mapPane = doc.querySelector('.leaflet-map-pane');
+                if (mapPane) {
+                    // This is a workaround for html2canvas to correctly capture leaflet maps with CSS transforms.
+                    // We get the transform value, convert it to left/top positioning, and then remove the transform.
+                    const transform = mapPane.style.transform;
+                    const regex = /translate3d\(([-\d.]+)px,\s*([-\d.]+)px,.*\)/;
+                    const match = transform.match(regex);
+                    if (match) {
+                        mapPane.style.transform = 'none';
+                        mapPane.style.left = `${match[1]}px`;
+                        mapPane.style.top = `${match[2]}px`;
+                    }
                 }
-            }).then((canvas) => {
-                onSketchChange(canvas.toDataURL('image/png'));
-            }).catch(e => console.error("html2canvas error:", e));
+            }
+        });
+        return canvas.toDataURL('image/png');
+      } catch (e) {
+        console.error("html2canvas error:", e);
+        return null;
+      }
+    }, []);
+
+    useImperativeHandle(ref, () => ({
+        getCenteredSketch: async () => {
+            const map = mapRef.current;
+            if (!map) return null;
+
+            const allLatLngs = [
+                ...points.map(p => p.getLatLng()),
+                ...zones.flatMap(z => {
+                    const center = z.layer.getLatLng();
+                    const radius = z.layer.getRadius();
+                    const north = L.latLng(center.lat + (radius / 111320), center.lng);
+                    const south = L.latLng(center.lat - (radius / 111320), center.lng);
+                    const east = L.latLng(center.lat, center.lng + (radius / (111320 * Math.cos(center.lat * Math.PI/180))));
+                    const west = L.latLng(center.lat, center.lng - (radius / (111320 * Math.cos(center.lat * Math.PI/180))));
+                    return [north, south, east, west];
+                }),
+                ...units.map(u => u.getLatLng()),
+                ...texts.map(t => t.getLatLng())
+            ];
+
+            if (allLatLngs.length === 0) {
+                return updateSketch(true);
+            }
+
+            const bounds = L.latLngBounds(allLatLngs);
+            if (!bounds.isValid()) {
+                return updateSketch(true);
+            }
+
+            const originalCenter = map.getCenter();
+            const originalZoom = map.getZoom();
+
+            map.fitBounds(bounds, { padding: [50, 50], animate: false });
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+
+            const sketch = await updateSketch(true);
+
+            map.setView(originalCenter, originalZoom, { animate: false });
+            await new Promise(resolve => setTimeout(resolve, 100));
+            map.invalidateSize();
+            
+            return sketch;
         }
-    }, [onSketchChange]);
+    }));
 
     useEffect(() => {
         if (mapRef.current) {
@@ -59,17 +121,14 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 L.control.attribution({ position: 'bottomright', prefix: '' }).addTo(map);
                 mapRef.current = map;
                 
-                const onMapChange = () => setTimeout(updateSketch, 300);
-                map.on('moveend zoomend layeradd layerremove', onMapChange);
                 map.on('click', () => setSelectedZone(null));
                 
                 setTimeout(() => map.invalidateSize(), 100);
-                setTimeout(updateSketch, 1000);
             } catch (e) { console.error("Leaflet initialization error:", e); }
         } else if (isActive && mapRef.current) {
             setTimeout(() => mapRef.current.invalidateSize(), 10);
         }
-    }, [isActive, updateSketch]);
+    }, [isActive]);
     
     const handleSearch = async () => {
         if (!searchQuery.trim() || !mapRef.current) return;
@@ -89,13 +148,13 @@ const Croquis = ({ onSketchChange, isActive }) => {
             alert('No se pudo realizar la búsqueda.');
         }
     };
-
+    
     const createDraggableCircle = (centerLatLng, options) => {
         const map = mapRef.current;
         const circle = L.circle(centerLatLng, options).addTo(map);
         
         let isDragging = false;
-
+        
         circle.on('mousedown', (e) => {
             if (tool) return;
             L.DomEvent.stopPropagation(e);
@@ -114,9 +173,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
             map.dragging.enable();
             map.off('mousemove', onDrag);
             map.off('mouseup', onDragEnd);
-             if (isDragging) {
-                updateSketch();
-            }
         };
         
         return circle;
@@ -132,7 +188,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
             selectedZone.layer.setRadius(newRadius);
             const newZones = zones.map(z => z.id === selectedZone.id ? { ...z, radius: newRadius } : z);
             setZones(newZones);
-            updateSketch();
         }
     };
     
@@ -147,7 +202,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
         switch(tool) {
             case 'point':
                 layer = L.marker(latlng, { draggable: true }).addTo(map);
-                layer.on('dragend', updateSketch);
                 const pointData = layer;
                 history.current.push({ type: 'add', element: pointData, elementType: 'point' });
                 setPoints(prev => [...prev, pointData]);
@@ -167,7 +221,7 @@ const Croquis = ({ onSketchChange, isActive }) => {
             case 'text': {
                 if (!textLabel.trim()) return;
                 const icon = L.divIcon({ className: 'leaflet-text-icon', html: `<div style="font-weight: bold; color: #facc15; text-shadow: 1px 1px 2px black; font-size: 16px; white-space: nowrap; transform-origin: center; transform: ${isTextVertical ? 'rotate(-90deg)' : 'none'};">${textLabel.trim().toUpperCase()}</div>`});
-                layer = L.marker(latlng, { icon, draggable: true }).addTo(map).on('dragend', updateSketch);
+                layer = L.marker(latlng, { icon, draggable: true }).addTo(map);
                 const textData = layer;
                 history.current.push({ type: 'add', element: textData, elementType: 'text' });
                 setTexts(prev => [...prev, textData]);
@@ -180,7 +234,7 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 const symbolHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">${svgPaths[unitType]}</svg>`;
                 const html = `<div style="text-align: center; display: flex; flex-direction: column; align-items: center;"><div style="width: 32px; height: 32px; border-radius: 50%; background-color: ${colors[unitType]}; color: white; display:flex; justify-content:center; align-items:center; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.7);">${symbolHtml}</div><div style="color: white; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 2px black; margin-top: 3px; background-color: rgba(0,0,0,0.5); padding: 1px 4px; border-radius: 3px;">${unitLabel}</div></div>`;
                 const icon = L.divIcon({ className: 'leaflet-unit-icon', html });
-                layer = L.marker(latlng, { icon, draggable: true }).addTo(map).on('dragend', updateSketch);
+                layer = L.marker(latlng, { icon, draggable: true }).addTo(map);
                 const unitData = layer;
                 history.current.push({ type: 'add', element: unitData, elementType: 'unit' });
                 setUnits(prev => [...prev, unitData]);
@@ -195,9 +249,8 @@ const Croquis = ({ onSketchChange, isActive }) => {
             setZones(prev => [...prev, zoneData]);
         }
         
-        updateSketch();
         setTool(null);
-    }, [tool, mapRef, impactRadius, adjacencyRadius, influenceRadius, unitLabel, unitType, textLabel, isTextVertical, updateSketch, points]);
+    }, [tool, mapRef, impactRadius, adjacencyRadius, influenceRadius, unitLabel, unitType, textLabel, isTextVertical, points]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -224,7 +277,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 case 'unit': setUnits(prev => prev.filter(u => u !== lastAction.element)); break;
                 case 'text': setTexts(prev => prev.filter(t => t !== lastAction.element)); break;
             }
-            updateSketch();
         }
     };
 
@@ -236,7 +288,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
         setTexts([]);
         history.current = [];
         setSelectedZone(null);
-        updateSketch();
     };
     
     const ToolButton = ({ toolName, icon, label }) => (
@@ -247,7 +298,7 @@ const Croquis = ({ onSketchChange, isActive }) => {
     );
 
     return (
-        React.createElement("div", { ref: containerRef, className: `flex flex-col gap-4 transition-all duration-300 ${isMaximized ? 'fixed inset-0 bg-zinc-900 z-50 p-4' : 'h-[75vh]'}` },
+        React.createElement("div", { ref: containerRef, className: `flex flex-col gap-4 transition-all duration-300 ${isMaximized ? 'fixed inset-0 bg-zinc-900 z-50 p-4' : 'h-[85vh]'}` },
             React.createElement("div", { className: "bg-zinc-800/60 p-3 rounded-xl flex flex-wrap items-center justify-between gap-2" },
                 React.createElement("div", { className: "flex flex-wrap items-center gap-2" },
                     React.createElement(ToolButton, { toolName: "point", label: "Marcar Punto", icon: React.createElement(CrosshairsIcon, { className: "w-6 h-6" }) }),
@@ -327,6 +378,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
             )
         )
     );
-};
+});
 
 export default Croquis;

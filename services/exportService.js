@@ -757,7 +757,6 @@ export const exportCommandPostToPdf = (
 ) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
     const margin = 14;
     let y = 15;
 
@@ -864,27 +863,42 @@ export const exportCommandPostToPdf = (
 
     // --- Croquis Page ---
     if (croquisSketch) {
-        doc.addPage();
-        y = 15;
-        doc.setFontSize(16);
-        doc.text("Croquis del Incidente", pageWidth / 2, y, { align: 'center' });
-        y += 10;
-        
         try {
-            const img = new Image();
-            img.src = croquisSketch;
             const imgProps = doc.getImageProperties(croquisSketch);
-            const imgWidth = pageWidth - (margin * 2);
-            const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-            const finalHeight = Math.min(imgHeight, pageHeight - y - margin);
-            const finalWidth = (finalHeight * imgProps.width) / imgProps.height;
-            const xPos = (pageWidth - finalWidth) / 2;
+            const isLandscape = imgProps.width > imgProps.height;
+            // FIX: Correctly call addPage with format and orientation arguments. The options object syntax is not supported by the version of jsPDF being used.
+            doc.addPage(undefined, isLandscape ? 'landscape' : 'portrait');
+            
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            y = 15;
 
+            doc.setFontSize(16);
+            doc.text("Croquis del Incidente", pageW / 2, y, { align: 'center' });
+            y += 10;
+
+            const availableWidth = pageW - (margin * 2);
+            const availableHeight = pageH - y - margin;
+
+            const imgRatio = imgProps.width / imgProps.height;
+            const pageRatio = availableWidth / availableHeight;
+
+            let finalWidth, finalHeight;
+            if (imgRatio > pageRatio) {
+                finalWidth = availableWidth;
+                finalHeight = finalWidth / imgRatio;
+            } else {
+                finalHeight = availableHeight;
+                finalWidth = finalHeight * imgRatio;
+            }
+
+            const xPos = (pageW - finalWidth) / 2;
             doc.addImage(croquisSketch, 'PNG', xPos, y, finalWidth, finalHeight);
         } catch (error) {
             console.error("Error adding image to PDF:", error);
+            doc.addPage();
             doc.setTextColor(255, 0, 0);
-            doc.text("No se pudo cargar el croquis.", margin, y);
+            doc.text("No se pudo cargar el croquis.", margin, 15);
         }
     }
     

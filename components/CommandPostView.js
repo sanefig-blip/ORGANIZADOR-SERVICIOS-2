@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons.js';
 import { exportCommandPostToPdf } from '../services/exportService.js';
 import Croquis from './Croquis.js';
@@ -28,7 +28,7 @@ const TabButton = ({ activeTab, tabName, label, onClick }) => (
 
 const CommandPostView = ({ unitReportData }) => {
     const [activeTab, setActiveTab] = useState('control');
-    const [croquisSketch, setCroquisSketch] = useState(null);
+    const croquisRef = useRef(null);
 
     const allUnitsForTracking = useMemo(() => {
         if (!unitReportData) return [];
@@ -172,7 +172,8 @@ const CommandPostView = ({ unitReportData }) => {
         '': 'bg-zinc-600 text-white'
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        const croquisSketch = await croquisRef.current?.getCenteredSketch();
         exportCommandPostToPdf(
             incidentDetails,
             trackedUnits,
@@ -283,7 +284,7 @@ const CommandPostView = ({ unitReportData }) => {
 
             activeTab === 'croquis' && (
                 React.createElement("div", { className: "animate-fade-in" },
-                    React.createElement(Croquis, { onSketchChange: setCroquisSketch, isActive: activeTab === 'croquis' })
+                    React.createElement(Croquis, { ref: croquisRef, isActive: activeTab === 'croquis' })
                 )
             ),
             
