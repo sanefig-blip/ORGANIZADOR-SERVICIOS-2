@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { TrashIcon, EngineIcon, LadderIcon, AmbulanceIcon, CommandPostIcon, PersonIcon, CrosshairsIcon, MaximizeIcon, MinimizeIcon, SearchIcon } from './icons.js';
+import { TrashIcon, EngineIcon, LadderIcon, AmbulanceIcon, CommandPostIcon, PersonIcon, CrosshairsIcon, MaximizeIcon, MinimizeIcon, SearchIcon, ArrowUturnLeftIcon } from './icons.js';
 import { streets } from '../data/streets.js';
 
 const Croquis = ({ onSketchChange, isActive }) => {
@@ -19,7 +19,13 @@ const Croquis = ({ onSketchChange, isActive }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isMaximized, setIsMaximized] = useState(false);
 
-    const layersRef = useRef([]);
+    const [points, setPoints] = useState([]);
+    const [zones, setZones] = useState([]);
+    const [units, setUnits] = useState([]);
+    const [texts, setTexts] = useState([]);
+    const [selectedZone, setSelectedZone] = useState(null);
+    
+    const history = useRef([]);
 
     const updateSketch = useCallback(() => {
         if (mapContainerRef.current && mapRef.current) {
@@ -30,6 +36,8 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 onclone: (doc) => {
                     const attribution = doc.querySelector('.leaflet-control-attribution');
                     if (attribution) attribution.style.display = 'none';
+                    const editor = doc.getElementById('radius-editor');
+                    if(editor) editor.style.display = 'none';
                 }
             }).then((canvas) => {
                 onSketchChange(canvas.toDataURL('image/png'));
@@ -37,11 +45,6 @@ const Croquis = ({ onSketchChange, isActive }) => {
         }
     }, [onSketchChange]);
 
-    const addLayer = useCallback((layer) => {
-        layersRef.current.push(layer);
-        updateSketch();
-    }, [updateSketch]);
-    
     useEffect(() => {
         if (mapRef.current) {
             setTimeout(() => mapRef.current.invalidateSize(), 300);
@@ -58,6 +61,7 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 
                 const onMapChange = () => setTimeout(updateSketch, 300);
                 map.on('moveend zoomend layeradd layerremove', onMapChange);
+                map.on('click', () => setSelectedZone(null));
                 
                 setTimeout(() => map.invalidateSize(), 100);
                 setTimeout(updateSketch, 1000);
@@ -86,29 +90,87 @@ const Croquis = ({ onSketchChange, isActive }) => {
         }
     };
 
+    const createDraggableCircle = (centerLatLng, options) => {
+        const map = mapRef.current;
+        const circle = L.circle(centerLatLng, options).addTo(map);
+        
+        let isDragging = false;
+
+        circle.on('mousedown', (e) => {
+            if (tool) return;
+            L.DomEvent.stopPropagation(e);
+            map.dragging.disable();
+            isDragging = false;
+            map.on('mousemove', onDrag);
+            map.on('mouseup', onDragEnd);
+        });
+
+        const onDrag = (e) => {
+            isDragging = true;
+            circle.setLatLng(e.latlng);
+        };
+
+        const onDragEnd = () => {
+            map.dragging.enable();
+            map.off('mousemove', onDrag);
+            map.off('mouseup', onDragEnd);
+             if (isDragging) {
+                updateSketch();
+            }
+        };
+        
+        return circle;
+    };
+
+    const handleZoneClick = (zone) => {
+        setSelectedZone(zone);
+    };
+
+    const handleRadiusChange = (e) => {
+        if (selectedZone) {
+            const newRadius = Number(e.target.value);
+            selectedZone.layer.setRadius(newRadius);
+            const newZones = zones.map(z => z.id === selectedZone.id ? { ...z, radius: newRadius } : z);
+            setZones(newZones);
+            updateSketch();
+        }
+    };
+    
     const handleMapClick = useCallback((e) => {
         const map = mapRef.current;
         if (!map || !tool) return;
-        const latlng = e.latlng;
+        const latlng = tool === 'point' ? e.latlng : points.length > 0 ? points[points.length - 1].getLatLng() : e.latlng;
+        
         let layer;
+        let initialRadius = 0;
 
         switch(tool) {
             case 'point':
-                layer = L.marker(latlng).addTo(map);
+                layer = L.marker(latlng, { draggable: true }).addTo(map);
+                layer.on('dragend', updateSketch);
+                const pointData = layer;
+                history.current.push({ type: 'add', element: pointData, elementType: 'point' });
+                setPoints(prev => [...prev, pointData]);
                 break;
             case 'impact':
-                layer = L.circle(latlng, { radius: impactRadius, color: '#ef4444', weight: 2, fillOpacity: 0.3 }).addTo(map);
+                initialRadius = impactRadius;
+                layer = createDraggableCircle(latlng, { radius: impactRadius, color: '#ef4444', weight: 2, fillOpacity: 0.3 });
                 break;
             case 'adjacency':
-                layer = L.circle(latlng, { radius: adjacencyRadius, color: '#f59e0b', weight: 2, fillOpacity: 0.3 }).addTo(map);
+                initialRadius = adjacencyRadius;
+                layer = createDraggableCircle(latlng, { radius: adjacencyRadius, color: '#f59e0b', weight: 2, fillOpacity: 0.3 });
                 break;
             case 'influence':
-                layer = L.circle(latlng, { radius: influenceRadius, color: '#22c55e', weight: 2, fillOpacity: 0.3 }).addTo(map);
+                initialRadius = influenceRadius;
+                layer = createDraggableCircle(latlng, { radius: influenceRadius, color: '#22c55e', weight: 2, fillOpacity: 0.3 });
                 break;
             case 'text': {
                 if (!textLabel.trim()) return;
                 const icon = L.divIcon({ className: 'leaflet-text-icon', html: `<div style="font-weight: bold; color: #facc15; text-shadow: 1px 1px 2px black; font-size: 16px; white-space: nowrap; transform-origin: center; transform: ${isTextVertical ? 'rotate(-90deg)' : 'none'};">${textLabel.trim().toUpperCase()}</div>`});
                 layer = L.marker(latlng, { icon, draggable: true }).addTo(map).on('dragend', updateSketch);
+                const textData = layer;
+                history.current.push({ type: 'add', element: textData, elementType: 'text' });
+                setTexts(prev => [...prev, textData]);
                 break;
             }
             case 'unit': {
@@ -119,12 +181,23 @@ const Croquis = ({ onSketchChange, isActive }) => {
                 const html = `<div style="text-align: center; display: flex; flex-direction: column; align-items: center;"><div style="width: 32px; height: 32px; border-radius: 50%; background-color: ${colors[unitType]}; color: white; display:flex; justify-content:center; align-items:center; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.7);">${symbolHtml}</div><div style="color: white; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 2px black; margin-top: 3px; background-color: rgba(0,0,0,0.5); padding: 1px 4px; border-radius: 3px;">${unitLabel}</div></div>`;
                 const icon = L.divIcon({ className: 'leaflet-unit-icon', html });
                 layer = L.marker(latlng, { icon, draggable: true }).addTo(map).on('dragend', updateSketch);
+                const unitData = layer;
+                history.current.push({ type: 'add', element: unitData, elementType: 'unit' });
+                setUnits(prev => [...prev, unitData]);
                 break;
             }
         }
-        if (layer) addLayer(layer);
+        
+        if (tool === 'impact' || tool === 'adjacency' || tool === 'influence') {
+            const zoneData = { layer, radius: initialRadius, id: `zone-${Date.now()}` };
+            layer.on('click', L.DomEvent.stopPropagation).on('click', () => handleZoneClick(zoneData));
+            history.current.push({ type: 'add', element: zoneData, elementType: 'zone' });
+            setZones(prev => [...prev, zoneData]);
+        }
+        
+        updateSketch();
         setTool(null);
-    }, [tool, mapRef, impactRadius, adjacencyRadius, influenceRadius, unitLabel, unitType, textLabel, isTextVertical, addLayer, updateSketch]);
+    }, [tool, mapRef, impactRadius, adjacencyRadius, influenceRadius, unitLabel, unitType, textLabel, isTextVertical, updateSketch, points]);
 
     useEffect(() => {
         const map = mapRef.current;
@@ -139,10 +212,30 @@ const Croquis = ({ onSketchChange, isActive }) => {
         }
         return () => { if (map) map.off('click', handleMapClick); };
     }, [tool, handleMapClick]);
+    
+    const undoLastAction = () => {
+        const lastAction = history.current.pop();
+        if (lastAction) {
+            mapRef.current.removeLayer(lastAction.element.layer || lastAction.element);
+
+            switch(lastAction.elementType) {
+                case 'point': setPoints(prev => prev.filter(p => p !== lastAction.element)); break;
+                case 'zone': setZones(prev => prev.filter(z => z.id !== lastAction.element.id)); if (selectedZone?.id === lastAction.element.id) setSelectedZone(null); break;
+                case 'unit': setUnits(prev => prev.filter(u => u !== lastAction.element)); break;
+                case 'text': setTexts(prev => prev.filter(t => t !== lastAction.element)); break;
+            }
+            updateSketch();
+        }
+    };
 
     const clearAll = () => {
-        layersRef.current.forEach(layer => mapRef.current?.removeLayer(layer));
-        layersRef.current = [];
+        [...points, ...zones.map(z => z.layer), ...units, ...texts].forEach(layer => mapRef.current?.removeLayer(layer));
+        setPoints([]);
+        setZones([]);
+        setUnits([]);
+        setTexts([]);
+        history.current = [];
+        setSelectedZone(null);
         updateSketch();
     };
     
@@ -200,13 +293,38 @@ const Croquis = ({ onSketchChange, isActive }) => {
                         React.createElement("input", { type: "text", value: searchQuery, onKeyDown: (e) => {if(e.key === 'Enter') handleSearch()}, onChange: e => setSearchQuery(e.target.value), placeholder: "Buscar dirección...", className: "bg-zinc-700 rounded px-2 py-1 text-white w-40 text-sm" }),
                         React.createElement("button", { onClick: handleSearch, className: "p-2 bg-sky-600 hover:bg-sky-500 rounded text-white" }, React.createElement(SearchIcon, { className: "w-4 h-4" }))
                      ),
+                     React.createElement("button", { onClick: undoLastAction, className: "p-2 bg-yellow-600 hover:bg-yellow-500 rounded-md text-white", title: "Deshacer" }, React.createElement(ArrowUturnLeftIcon, { className: "w-5 h-5" })),
                      React.createElement("button", { onClick: clearAll, className: "p-2 bg-red-600 hover:bg-red-500 rounded-md text-white", title: "Limpiar Todo" }, React.createElement(TrashIcon, { className: "w-5 h-5" })),
                      React.createElement("button", { onClick: () => setIsMaximized(!isMaximized), className: "p-2 bg-zinc-700 hover:bg-zinc-600 rounded-md text-white", title: isMaximized ? "Minimizar" : "Maximizar" },
                         isMaximized ? React.createElement(MinimizeIcon, { className: "w-5 h-5" }) : React.createElement(MaximizeIcon, { className: "w-5 h-5" })
                     )
                 )
             ),
-            React.createElement("div", { ref: mapContainerRef, className: "w-full h-full rounded-xl", style: { backgroundColor: '#18181b' } })
+            React.createElement("div", { className: "relative w-full h-full" },
+                React.createElement("div", { ref: mapContainerRef, className: "w-full h-full rounded-xl", style: { backgroundColor: '#18181b' } }),
+                selectedZone && (
+                     React.createElement("div", { id: "radius-editor", className: "absolute top-2 left-2 bg-zinc-800/80 backdrop-blur-sm p-3 rounded-lg shadow-lg z-[1000] animate-fade-in text-white text-sm" },
+                        React.createElement("label", { className: "flex items-center gap-2" },
+                            "Radio (m):",
+                            React.createElement("input", {
+                                type: "range",
+                                min: "10",
+                                max: "500",
+                                step: "5",
+                                value: selectedZone.radius,
+                                onChange: handleRadiusChange,
+                                className: "w-32"
+                            }),
+                            React.createElement("input", {
+                                type: "number",
+                                value: selectedZone.radius,
+                                onChange: handleRadiusChange,
+                                className: "w-20 bg-zinc-700 rounded p-1"
+                            })
+                        )
+                    )
+                )
+            )
         )
     );
 };
